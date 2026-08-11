@@ -45,7 +45,7 @@ validate_scores <- function(scores, n_expected = NULL, name = "scores") {
     )
   }
 
-  scores
+  invisible(scores)
 }
 
 validate_reference_inputs <- function(
