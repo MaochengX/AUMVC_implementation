@@ -1,6 +1,6 @@
 fit_ocsvm <- function(
     x_train,
-    nu = 0.05,
+    nu = 0.5,
     gamma = 1 / ncol(x_train)
 ) {
   if (!requireNamespace("e1071", quietly = TRUE)) {
