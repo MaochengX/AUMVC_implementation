@@ -1,67 +1,52 @@
-trapezoid_area <- function(x, y) {
-  sum(
-    diff(x) *
-      (head(y, -1L) + tail(y, -1L)) / 2
-  )
-}
-
 aumvc_from_scores <- function(
     evaluation_scores,
     reference_scores,
     box_volume,
     score_direction = "normality",
-    alpha_grid = seq(0.9, 0.999, length.out = 100L)
+    alpha_grid = seq(0.9, 0.999, by = 0.0001)
 ) {
+  alpha_grid <- validate_alpha_grid(alpha_grid)
+
   evaluation_scores <- orient_scores(
-    evaluation_scores,
+    validate_scores(evaluation_scores),
     score_direction
   )
 
   reference_scores <- orient_scores(
-    reference_scores,
+    validate_scores(reference_scores),
     score_direction
   )
 
-  level_sets <- level_set_table(
-    evaluation_scores,
-    reference_scores,
-    box_volume
+  n <- length(evaluation_scores)
+  ordered_scores <- sort(evaluation_scores, decreasing = TRUE)
+
+  k <- pmin(n, ceiling(alpha_grid * n))
+  threshold <- ordered_scores[k]
+
+  occupancy <- vapply(
+    threshold,
+    function(u) mean(reference_scores >= u),
+    numeric(1)
   )
 
-  mv_curve <- do.call(
-    rbind,
-    lapply(
-      alpha_grid,
-      function(alpha) {
-        candidates <- which(level_sets$mass >= alpha)
-
-        chosen <- candidates[
-          which.min(level_sets$volume[candidates])
-        ]
-
-        data.frame(
-          alpha = alpha,
-          threshold = level_sets$threshold[chosen],
-          empirical_mass = level_sets$mass[chosen],
-          volume = level_sets$volume[chosen],
-          volume_se = level_sets$volume_se[chosen]
-        )
-      }
-    )
+  curve <- data.frame(
+    alpha = alpha_grid,
+    threshold = threshold,
+    empirical_mass = vapply(
+      threshold,
+      function(u) mean(evaluation_scores >= u),
+      numeric(1)
+    ),
+    volume = box_volume * occupancy,
+    volume_normalized = occupancy
   )
-
-  mv_curve$volume_normalized <- mv_curve$volume / box_volume
 
   list(
-    mv_curve = mv_curve,
-    level_sets = level_sets,
-    aumvc = trapezoid_area(
-      mv_curve$alpha,
-      mv_curve$volume
-    ),
+    mv_curve = curve,
+    aumvc = trapezoid_area(curve$alpha, curve$volume),
     aumvc_normalized = trapezoid_area(
-      mv_curve$alpha,
-      mv_curve$volume_normalized
+      curve$alpha,
+      curve$volume_normalized
     )
   )
 }
@@ -71,24 +56,26 @@ aumvc <- function(
     reference,
     score_fun,
     score_direction = "normality",
-    alpha_grid = seq(0.9, 0.999, length.out = 100L)
+    alpha_grid = seq(0.9, 0.999, by = 0.0001)
 ) {
-  evaluation_scores <- score_fun(x_eval)
+  x_eval <- validate_matrix(x_eval, "x_eval")
+
+  if (!is.function(score_fun)) stop("score_fun must be a function", call. = FALSE)
+
+  evaluation_scores <- validate_scores(
+    score_fun(x_eval),
+    nrow(x_eval),
+    "evaluation_scores"
+  )
+
+  reference_scores <- score_reference_repetitions(reference, score_fun)
 
   repetitions <- lapply(
-    seq_len(reference$n_mc_repetitions),
-    function(r) {
-      reference_points <- sample_reference_points(
-        reference$box,
-        reference$n_reference,
-        reference$seeds[r]
-      )
-
-      reference_scores <- score_fun(reference_points)
-
+    reference_scores,
+    function(scores) {
       aumvc_from_scores(
         evaluation_scores,
-        reference_scores,
+        scores,
         reference$box$volume,
         score_direction,
         alpha_grid
@@ -96,69 +83,39 @@ aumvc <- function(
     }
   )
 
-  aumvc_values <- vapply(
-    repetitions,
-    function(x) x$aumvc,
-    numeric(1L)
-  )
-
-  normalized_values <- vapply(
+  values <- vapply(repetitions, function(x) x$aumvc, numeric(1))
+  normalized <- vapply(
     repetitions,
     function(x) x$aumvc_normalized,
-    numeric(1L)
+    numeric(1)
   )
 
   volume_matrix <- do.call(
     cbind,
-    lapply(
-      repetitions,
-      function(x) x$mv_curve$volume
-    )
+    lapply(repetitions, function(x) x$mv_curve$volume)
   )
 
-  normalized_matrix <- do.call(
-    cbind,
-    lapply(
-      repetitions,
-      function(x) x$mv_curve$volume_normalized
-    )
-  )
+  curve <- repetitions[[1L]]$mv_curve
+  curve$volume <- rowMeans(volume_matrix)
+  curve$volume_normalized <- curve$volume / reference$box$volume
 
-  mv_curve <- repetitions[[1L]]$mv_curve
-  mv_curve$volume <- rowMeans(volume_matrix)
-  mv_curve$volume_normalized <- rowMeans(normalized_matrix)
+  if (length(values) > 1L) {
+    curve$volume_mc_se <- apply(volume_matrix, 1L, sd) /
+      sqrt(length(values))
 
-  if (reference$n_mc_repetitions > 1L) {
-    mv_curve$volume_mc_sd <- apply(
-      volume_matrix,
-      1L,
-      sd
-    )
-
-    mv_curve$volume_mc_se <- mv_curve$volume_mc_sd /
-      sqrt(reference$n_mc_repetitions)
-
-    aumvc_mc_sd <- sd(aumvc_values)
-    aumvc_mc_se <- aumvc_mc_sd /
-      sqrt(reference$n_mc_repetitions)
+    mc_sd <- sd(values)
+    mc_se <- mc_sd / sqrt(length(values))
   } else {
-    mv_curve$volume_mc_sd <- NA_real_
-    mv_curve$volume_mc_se <- NA_real_
-    aumvc_mc_sd <- NA_real_
-    aumvc_mc_se <- NA_real_
+    curve$volume_mc_se <- NA_real_
+    mc_sd <- NA_real_
+    mc_se <- NA_real_
   }
 
   list(
-    mv_curve = mv_curve,
-    aumvc = mean(aumvc_values),
-    aumvc_normalized = mean(normalized_values),
-    aumvc_mc_sd = aumvc_mc_sd,
-    aumvc_mc_se = aumvc_mc_se,
-    replicates = data.frame(
-      repetition = seq_along(aumvc_values),
-      seed = reference$seeds,
-      aumvc = aumvc_values,
-      aumvc_normalized = normalized_values
-    )
+    mv_curve = curve,
+    aumvc = mean(values),
+    aumvc_normalized = mean(normalized),
+    aumvc_mc_sd = mc_sd,
+    aumvc_mc_se = mc_se
   )
 }

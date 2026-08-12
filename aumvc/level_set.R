@@ -1,15 +1,27 @@
 orient_scores <- function(scores, direction) {
-  if (direction == "anomaly") {
-    -as.numeric(scores)
-  } else {
-    as.numeric(scores)
-  }
+  if (direction == "normality") return(as.numeric(scores))
+  if (direction == "anomaly") return(-as.numeric(scores))
+
+  stop(
+    "score_direction must be 'normality' or 'anomaly'",
+    call. = FALSE
+  )
+}
+
+trapezoid_area <- function(x, y) {
+  sum(diff(x) * (head(y, -1L) + tail(y, -1L)) / 2)
 }
 
 fit_reference_box <- function(x_train) {
+  x_train <- validate_matrix(x_train, "x_train")
+
   lower <- apply(x_train, 2L, min)
   upper <- apply(x_train, 2L, max)
   width <- upper - lower
+
+  if (any(width <= 0)) {
+    stop("The reference split has a constant coordinate", call. = FALSE)
+  }
 
   list(
     lower = as.numeric(lower),
@@ -23,38 +35,48 @@ fit_reference_box <- function(x_train) {
 sample_reference_points <- function(box, n_reference, seed) {
   set.seed(seed)
 
-  columns <- lapply(
-    seq_len(box$dimension),
-    function(j) {
-      runif(
-        n_reference,
-        min = box$lower[j],
-        max = box$upper[j]
-      )
-    }
+  x <- matrix(
+    runif(n_reference * box$dimension),
+    nrow = n_reference
   )
 
-  matrix(
-    unlist(columns, use.names = FALSE),
-    nrow = n_reference,
-    ncol = box$dimension
-  )
+  x <- sweep(x, 2L, box$width, "*")
+  sweep(x, 2L, box$lower, "+")
 }
 
 make_reference <- function(
     x_train,
-    n_reference = 100000L,
+    n_reference = 20000L,
     n_mc_repetitions = 5L,
-    seed = 2026L
+    seed = 2030L
 ) {
-  box <- fit_reference_box(x_train)
+  x_train <- validate_matrix(x_train, "x_train")
 
   list(
-    box = box,
+    box = fit_reference_box(x_train),
     n_reference = as.integer(n_reference),
     n_mc_repetitions = as.integer(n_mc_repetitions),
-    seeds = as.integer(seed) + seq_len(n_mc_repetitions) - 1L,
+    seeds = seed + seq_len(n_mc_repetitions) - 1L,
     dimension = ncol(x_train)
+  )
+}
+
+score_reference_repetitions <- function(reference, score_fun) {
+  lapply(
+    seq_len(reference$n_mc_repetitions),
+    function(r) {
+      points <- sample_reference_points(
+        reference$box,
+        reference$n_reference,
+        reference$seeds[r]
+      )
+
+      validate_scores(
+        score_fun(points),
+        reference$n_reference,
+        "reference_scores"
+      )
+    }
   )
 }
 
@@ -64,33 +86,27 @@ level_set_table <- function(
     box_volume
 ) {
   thresholds <- sort(
-    unique(evaluation_scores),
+    unique(c(evaluation_scores, reference_scores)),
     decreasing = TRUE
   )
 
-  mass <- vapply(
-    thresholds,
-    function(u) mean(evaluation_scores >= u),
-    numeric(1L)
+  eval_bin <- tabulate(
+    match(evaluation_scores, thresholds),
+    nbins = length(thresholds)
   )
 
-  occupancy <- vapply(
-    thresholds,
-    function(u) mean(reference_scores >= u),
-    numeric(1L)
+  ref_bin <- tabulate(
+    match(reference_scores, thresholds),
+    nbins = length(thresholds)
   )
 
-  volume <- box_volume * occupancy
-
-  volume_se <- box_volume * sqrt(
-    occupancy * (1 - occupancy) / length(reference_scores)
-  )
+  mass <- cumsum(eval_bin) / length(evaluation_scores)
+  occupancy <- cumsum(ref_bin) / length(reference_scores)
 
   data.frame(
     threshold = thresholds,
     mass = mass,
     occupancy = occupancy,
-    volume = volume,
-    volume_se = volume_se
+    volume = box_volume * occupancy
   )
 }

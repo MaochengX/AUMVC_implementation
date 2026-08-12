@@ -7,18 +7,16 @@ validate_matrix <- function(x, name = "x") {
     x <- as.matrix(x)
   }
 
-  if (!is.numeric(x)) {
-    stop(name, "must be numeric", call. = FALSE)
-  }
-
+  if (!is.numeric(x)) stop(name, " must be numeric", call. = FALSE)
   storage.mode(x) <- "double"
 
-  if (nrow(x) < 1L || ncol(x) < 1L) {
-    stop(name, "cannot be empty", call. = FALSE)
-  }
-
-  if (anyNA(x) || !all(is.finite(x))) {
-    stop(name, "cannot contain NA or infinite values", call. = FALSE)
+  if (
+    nrow(x) < 1L ||
+    ncol(x) < 1L ||
+    anyNA(x) ||
+    !all(is.finite(x))
+  ) {
+    stop(name, " must be a finite numeric matrix", call. = FALSE)
   }
 
   x
@@ -27,144 +25,42 @@ validate_matrix <- function(x, name = "x") {
 validate_scores <- function(scores, n_expected = NULL, name = "scores") {
   scores <- as.numeric(scores)
 
-  if (length(scores) < 1L) {
-    stop(name, "cannot be empty", call. = FALSE)
-  }
-
-  if (anyNA(scores) || !all(is.finite(scores))) {
-    stop(name, "cannot contain NA or infinite values", call. = FALSE)
+  if (length(scores) < 1L || anyNA(scores) || !all(is.finite(scores))) {
+    stop(name, " must contain finite numeric values", call. = FALSE)
   }
 
   if (!is.null(n_expected) && length(scores) != n_expected) {
-    stop(
-      name,
-      "must contain",
-      n_expected,
-      "values, one per observation",
-      call. = FALSE
-    )
+    stop(name, " has the wrong length", call. = FALSE)
   }
 
-  invisible(scores)
+  scores
 }
 
-validate_reference_inputs <- function(
-    x_train,
-    n_reference,
-    n_mc_repetitions,
-    seed
-) {
-  x_train <- validate_matrix(x_train, "x_train")
-
-  widths <- apply(x_train, 2L, max) - apply(x_train, 2L, min)
-
-  if (any(widths <= 0)) {
-    stop("x_train contains a constant coordinate", call. = FALSE)
-  }
-
-  if (
-    length(n_reference) != 1L ||
-    !is.finite(n_reference) ||
-    n_reference < 1 ||
-    n_reference != as.integer(n_reference)
-  ) {
-    stop("n_reference must be a positive integer", call. = FALSE)
-  }
-
-  if (
-    length(n_mc_repetitions) != 1L ||
-    !is.finite(n_mc_repetitions) ||
-    n_mc_repetitions < 1 ||
-    n_mc_repetitions != as.integer(n_mc_repetitions)
-  ) {
-    stop("n_mc_repetitions must be a positive integer", call. = FALSE)
-  }
-
-  if (length(seed) != 1L || !is.finite(seed)) {
-    stop("seed must be one finite number", call. = FALSE)
-  }
-
-  x_train
-}
-
-validate_aumvc_inputs <- function(
-    x_eval,
-    reference,
-    score_fun,
-    score_direction,
-    alpha_grid
-) {
-  x_eval <- validate_matrix(x_eval, "x_eval")
-
-  if (!is.list(reference)) {
-    stop("reference must be created by make_reference()", call. = FALSE)
-  }
-
-  if (ncol(x_eval) != reference$dimension) {
-    stop("x_eval and reference must have the same dimension", call. = FALSE)
-  }
-
-  if (!is.function(score_fun)) {
-    stop("score_fun must be a function", call. = FALSE)
-  }
-
-  if (!(score_direction %in% c("normality", "anomaly"))) {
-    stop("score_direction must be 'normality' or 'anomaly'", call. = FALSE)
-  }
-
+validate_alpha_grid <- function(alpha_grid) {
   alpha_grid <- as.numeric(alpha_grid)
 
   if (
-    anyNA(alpha_grid) ||
-    !all(is.finite(alpha_grid)) ||
-    any(alpha_grid <= 0 | alpha_grid > 1) ||
+    length(alpha_grid) < 2L ||
+    any(alpha_grid <= 0 | alpha_grid >= 1) ||
     any(diff(alpha_grid) <= 0)
   ) {
-    stop("alpha_grid must be strictly increasing in (0, 1]", call. = FALSE)
+    stop("Invalid alpha_grid", call. = FALSE)
   }
 
-  x_eval
+  alpha_grid
 }
 
-validate_auemc_inputs <- function(
-    x_eval,
-    reference,
-    score_fun,
-    score_direction,
-    penalty_grid
-) {
-  x_eval <- validate_matrix(x_eval, "x_eval")
-
-  if (!is.list(reference)) {
-    stop("reference must be created by make_reference()", call. = FALSE)
-  }
-
-  if (ncol(x_eval) != reference$dimension) {
-    stop("x_eval and reference must have the same dimension", call. = FALSE)
-  }
-
-  if (!is.function(score_fun)) {
-    stop("score_fun must be a function", call. = FALSE)
-  }
-
-  if (!(score_direction %in% c("normality", "anomaly"))) {
-    stop("score_direction must be 'normality' or 'anomaly'", call. = FALSE)
-  }
-
-  penalty_grid <- as.numeric(penalty_grid)
+validate_tau_grid <- function(tau_grid) {
+  tau_grid <- as.numeric(tau_grid)
 
   if (
-    anyNA(penalty_grid) ||
-    !all(is.finite(penalty_grid)) ||
-    penalty_grid[1L] != 0 ||
-    any(penalty_grid < 0) ||
-    any(diff(penalty_grid) <= 0)
+    length(tau_grid) < 2L ||
+    tau_grid[1L] != 0 ||
+    any(tau_grid < 0) ||
+    any(diff(tau_grid) <= 0)
   ) {
-    stop(
-      "penalty_grid must start at 0 and be strictly increasing",
-      call. = FALSE
-    )
+    stop("Invalid tau_grid", call. = FALSE)
   }
 
-  x_eval
+  tau_grid
 }

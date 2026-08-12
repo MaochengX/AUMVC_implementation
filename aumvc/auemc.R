@@ -1,81 +1,70 @@
-trapezoid_area_em <- function(x, y) {
-  sum(
-    diff(x) *
-      (head(y, -1L) + tail(y, -1L)) / 2
-  )
-}
-
 auemc_from_scores <- function(
     evaluation_scores,
     reference_scores,
     box_volume,
     score_direction = "normality",
-    penalty_grid = seq(0, 100, by = 0.01),
-    penalty_scale = "normalized",
-    em_cutoff = 0.9
+    tau_grid = c(0, 10^seq(-6, 6, length.out = 800))
 ) {
+  tau_grid <- validate_tau_grid(tau_grid)
+
   evaluation_scores <- orient_scores(
-    evaluation_scores,
+    validate_scores(evaluation_scores),
     score_direction
   )
 
   reference_scores <- orient_scores(
-    reference_scores,
+    validate_scores(reference_scores),
     score_direction
   )
 
-  level_sets <- level_set_table(
+  sets <- level_set_table(
     evaluation_scores,
     reference_scores,
     box_volume
   )
 
-  if (penalty_scale == "normalized") {
-    tau <- penalty_grid
-    t <- tau / box_volume
-  } else {
-    t <- penalty_grid
-    tau <- t * box_volume
-  }
+  mass <- c(0, sets$mass)
+  occupancy <- c(0, sets$occupancy)
 
   em <- vapply(
-    tau,
-    function(current_tau) {
-      max(
-        0,
-        level_sets$mass -
-          current_tau * level_sets$occupancy
-      )
-    },
-    numeric(1L)
+    tau_grid,
+    function(tau) max(mass - tau * occupancy),
+    numeric(1)
   )
 
-  em_curve <- data.frame(
-    tau = tau,
-    t = t,
-    em = em
-  )
+  crossing <- which(em <= 0.9)[1L]
 
-  crossing <- which(em_curve$em <= em_cutoff)
-
-  cutoff <- if (length(crossing) > 0L) {
-    crossing[1L]
-  } else {
-    nrow(em_curve)
+  if (is.na(crossing)) {
+    stop("tau_grid does not reach EM = 0.9.", call. = FALSE)
   }
 
-  used <- seq_len(cutoff)
+  if (crossing == 1L) {
+    tau_cutoff <- 0
+    area_tau <- 0
+  } else {
+    i <- crossing - 1L
+
+    tau_cutoff <- tau_grid[i] +
+      (0.9 - em[i]) *
+      (tau_grid[crossing] - tau_grid[i]) /
+      (em[crossing] - em[i])
+
+    tau_area <- c(tau_grid[seq_len(i)], tau_cutoff)
+    em_area <- c(em[seq_len(i)], 0.9)
+
+    area_tau <- trapezoid_area(tau_area, em_area)
+  }
 
   list(
-    em_curve = em_curve,
-    auemc = trapezoid_area_em(
-      em_curve$t[used],
-      em_curve$em[used]
+    em_curve = data.frame(
+      tau = tau_grid,
+      t = tau_grid / box_volume,
+      em = em
     ),
-    auemc_normalized = trapezoid_area_em(
-      em_curve$tau[used],
-      em_curve$em[used]
-    )
+    tau_cutoff = tau_cutoff,
+    t_cutoff = tau_cutoff / box_volume,
+    auemc = area_tau / box_volume,
+    auemc_normalized = area_tau
   )
 }
 
@@ -84,89 +73,68 @@ auemc <- function(
     reference,
     score_fun,
     score_direction = "normality",
-    penalty_grid = seq(0, 100, by = 0.01),
-    penalty_scale = "normalized",
-    em_cutoff = 0.9
+    tau_grid = c(0, 10^seq(-6, 6, length.out = 800))
 ) {
-  evaluation_scores <- score_fun(x_eval)
+  x_eval <- validate_matrix(x_eval, "x_eval")
+
+  if (!is.function(score_fun)) stop("score_fun must be a function", call. = FALSE)
+
+  evaluation_scores <- validate_scores(
+    score_fun(x_eval),
+    nrow(x_eval),
+    "evaluation_scores"
+  )
+
+  reference_scores <- score_reference_repetitions(reference, score_fun)
 
   repetitions <- lapply(
-    seq_len(reference$n_mc_repetitions),
-    function(r) {
-      reference_points <- sample_reference_points(
-        reference$box,
-        reference$n_reference,
-        reference$seeds[r]
-      )
-
-      reference_scores <- score_fun(reference_points)
-
+    reference_scores,
+    function(scores) {
       auemc_from_scores(
         evaluation_scores,
-        reference_scores,
+        scores,
         reference$box$volume,
         score_direction,
-        penalty_grid,
-        penalty_scale,
-        em_cutoff
+        tau_grid
       )
     }
   )
 
-  auemc_values <- vapply(
-    repetitions,
-    function(x) x$auemc,
-    numeric(1L)
-  )
-
-  normalized_values <- vapply(
+  values <- vapply(repetitions, function(x) x$auemc, numeric(1))
+  normalized <- vapply(
     repetitions,
     function(x) x$auemc_normalized,
-    numeric(1L)
+    numeric(1)
   )
 
   em_matrix <- do.call(
     cbind,
-    lapply(
-      repetitions,
-      function(x) x$em_curve$em
-    )
+    lapply(repetitions, function(x) x$em_curve$em)
   )
 
-  em_curve <- repetitions[[1L]]$em_curve
-  em_curve$em <- rowMeans(em_matrix)
+  curve <- repetitions[[1L]]$em_curve
+  curve$em <- rowMeans(em_matrix)
 
-  if (reference$n_mc_repetitions > 1L) {
-    em_curve$em_mc_sd <- apply(
-      em_matrix,
-      1L,
-      sd
-    )
+  if (length(values) > 1L) {
+    curve$em_mc_se <- apply(em_matrix, 1L, sd) /
+      sqrt(length(values))
 
-    em_curve$em_mc_se <- em_curve$em_mc_sd /
-      sqrt(reference$n_mc_repetitions)
-
-    auemc_mc_sd <- sd(auemc_values)
-    auemc_mc_se <- auemc_mc_sd /
-      sqrt(reference$n_mc_repetitions)
+    mc_sd <- sd(values)
+    mc_se <- mc_sd / sqrt(length(values))
   } else {
-    em_curve$em_mc_sd <- NA_real_
-    em_curve$em_mc_se <- NA_real_
-    auemc_mc_sd <- NA_real_
-    auemc_mc_se <- NA_real_
+    curve$em_mc_se <- NA_real_
+    mc_sd <- NA_real_
+    mc_se <- NA_real_
   }
 
   list(
-    em_curve = em_curve,
-    auemc = mean(auemc_values),
-    auemc_normalized = mean(normalized_values),
-    auemc_mc_sd = auemc_mc_sd,
-    auemc_mc_se = auemc_mc_se,
-    replicates = data.frame(
-      repetition = seq_along(auemc_values),
-      seed = reference$seeds,
-      auemc = auemc_values,
-      auemc_normalized = normalized_values
+    em_curve = curve,
+    auemc = mean(values),
+    auemc_normalized = mean(normalized),
+    auemc_mc_sd = mc_sd,
+    auemc_mc_se = mc_se,
+    t_cutoff = mean(
+      vapply(repetitions, function(x) x$t_cutoff, numeric(1))
     )
   )
 }
