@@ -27,31 +27,11 @@ euclidean_distances <- function(x, y) {
   )
 }
 
-kth_distance <- function(x, k) {
-  sort(
-    x,
-    partial = k
-  )[k]
-}
-
-k_distinct_distance <- function(
+nearest_indices <- function(distances, k) {
+  order(
     distances,
-    k,
-    zero_tolerance = 1e-12
-) {
-  positive <- distances[
-    distances > zero_tolerance
-  ]
-
-  if (length(positive) < k) {
-    stop(
-      "Not enough distinct spatial coordinates for this value of k", call. = FALSE)
-  }
-
-  kth_distance(
-    positive,
-    k
-  )
+    decreasing = FALSE
+  )[seq_len(k)]
 }
 
 fit_lof <- function(
@@ -73,15 +53,6 @@ fit_lof <- function(
       "k must be between 1 and nrow(x_train) - 1", call. = FALSE)
   }
 
-  unique_x <- unique(
-    x_train
-  )
-
-  if (nrow(unique_x) <= k) {
-    stop(
-      "LOF requires at least k + 1 distinct spatial coordinates", call. = FALSE)
-  }
-
   distances <- euclidean_distances(
     x_train,
     x_train
@@ -89,49 +60,42 @@ fit_lof <- function(
 
   diag(distances) <- Inf
 
-  distinct_distances <- euclidean_distances(
-    x_train,
-    unique_x
+  neighbors <- lapply(
+    seq_len(n),
+    function(i) {
+      nearest_indices(
+        distances[i, ],
+        k
+      )
+    }
   )
 
   k_distance <- vapply(
     seq_len(n),
     function(i) {
-      k_distinct_distance(
-        distinct_distances[i, ],
-        k
+      max(
+        distances[
+          i,
+          neighbors[[i]]
+        ]
       )
     },
     numeric(1)
   )
 
-  neighborhoods <- lapply(
-    seq_len(n),
-    function(i) {
-      tolerance <- 1e-12 * max(
-        1,
-        k_distance[i]
-      )
-
-      which(
-        distances[i, ] <=
-          k_distance[i] + tolerance
-      )
-    }
-  )
-
   lrd <- vapply(
     seq_len(n),
     function(i) {
-      neighbors <- neighborhoods[[i]]
+      index <- neighbors[[i]]
 
       reachability <- pmax(
-        k_distance[neighbors],
-        distances[i, neighbors]
+        k_distance[index],
+        distances[i, index]
       )
 
-      1 / mean(
-        reachability
+      1 / (
+        mean(reachability) +
+          1e-10
       )
     },
     numeric(1)
@@ -139,7 +103,6 @@ fit_lof <- function(
 
   list(
     x_train = x_train,
-    unique_x = unique_x,
     k = k,
     k_distance = k_distance,
     lrd = lrd,
@@ -150,7 +113,7 @@ fit_lof <- function(
 score_lof <- function(
     model,
     newdata,
-    chunk_size = 1000L
+    chunk_size = 500L
 ) {
   newdata <- lof_matrix(
     newdata
@@ -190,41 +153,26 @@ score_lof <- function(
       model$x_train
     )
 
-    distinct_distances <- euclidean_distances(
-      query,
-      model$unique_x
-    )
-
     scores[start:end] <- vapply(
       seq_len(nrow(query)),
       function(i) {
-        d <- distances[i, ]
-
-        query_k <- k_distinct_distance(
-          distinct_distances[i, ],
+        index <- nearest_indices(
+          distances[i, ],
           model$k
         )
 
-        tolerance <- 1e-12 * max(
-          1,
-          query_k
-        )
-
-        neighbors <- which(
-          d <= query_k + tolerance
-        )
-
         reachability <- pmax(
-          model$k_distance[neighbors],
-          d[neighbors]
+          model$k_distance[index],
+          distances[i, index]
         )
 
-        query_lrd <- 1 / mean(
-          reachability
+        query_lrd <- 1 / (
+          mean(reachability) +
+            1e-10
         )
 
         mean(
-          model$lrd[neighbors]
+          model$lrd[index]
         ) / query_lrd
       },
       numeric(1)
