@@ -3,8 +3,8 @@ ocsvm_matrix <- function(x) {
   storage.mode(x) <- "double"
 
   if (
-    nrow(x) < 1 ||
-    ncol(x) < 1 ||
+    nrow(x) < 1L ||
+    ncol(x) < 1L ||
     anyNA(x) ||
     !all(is.finite(x))
   ) {
@@ -15,29 +15,21 @@ ocsvm_matrix <- function(x) {
 }
 
 gaussian_kernel <- function(x, y, gamma) {
-  d2 <- outer(rowSums(x^2), rowSums(y^2), "+") - 2 * tcrossprod(x, y)
+  d2 <- outer(rowSums(x^2), rowSums(y^2), "+") -
+    2 * tcrossprod(x, y)
+
   exp(-gamma * pmax(d2, 0))
 }
 
-solve_ocsvm_dual <- function(K, nu, tolerance = 1e-7, max_iter = 100000L) {
+solve_ocsvm_dual <- function(K, nu, tolerance = 1e-6, max_iter = 100000L) {
   n <- nrow(K)
   cap <- 1 / (nu * n)
+
   alpha <- rep(1 / n, n)
   gradient <- as.numeric(K %*% alpha)
+
   gap <- Inf
   converged <- FALSE
-
-  if (cap <= 1 / n + 1e-14) {
-    return(
-      list(
-        alpha = alpha,
-        gradient = gradient,
-        cap = cap,
-        gap = 0,
-        converged = TRUE
-      )
-    )
-  }
 
   for (iteration in seq_len(max_iter)) {
     increase <- which(alpha < cap - 1e-12)
@@ -45,6 +37,7 @@ solve_ocsvm_dual <- function(K, nu, tolerance = 1e-7, max_iter = 100000L) {
 
     i <- increase[which.min(gradient[increase])]
     j <- decrease[which.max(gradient[decrease])]
+
     gap <- gradient[j] - gradient[i]
 
     if (gap <= tolerance) {
@@ -55,19 +48,19 @@ solve_ocsvm_dual <- function(K, nu, tolerance = 1e-7, max_iter = 100000L) {
     curvature <- K[i, i] + K[j, j] - 2 * K[i, j]
     max_step <- min(cap - alpha[i], alpha[j])
 
-    if (curvature > 1e-14) {
-      step <- min(max_step, gap / curvature)
+    step <- if (curvature > 1e-14) {
+      min(max_step, gap / curvature)
     } else {
-      step <- max_step
+      max_step
     }
 
-    if (step <= 1e-15) {
-      break
-    }
+    if (step <= 1e-15) break
 
     alpha[i] <- alpha[i] + step
     alpha[j] <- alpha[j] - step
-    gradient <- gradient + step * (K[, i] - K[, j])
+
+    gradient <- gradient +
+      step * (K[, i] - K[, j])
   }
 
   list(
@@ -81,28 +74,15 @@ solve_ocsvm_dual <- function(K, nu, tolerance = 1e-7, max_iter = 100000L) {
 
 fit_ocsvm <- function(
     x_train,
-    nu = 0.05,
+    nu = 0.5,
     gamma = 1 / ncol(x_train),
-    tolerance = 1e-7,
+    tolerance = 1e-6,
     max_iter = 100000L
 ) {
   x_train <- ocsvm_matrix(x_train)
 
-  if (
-    length(nu) != 1 ||
-    !is.finite(nu) ||
-    nu <= 0 ||
-    nu > 1
-  ) {
-    stop("nu must lie in (0, 1]", call. = FALSE)
-  }
-
-  if (
-    length(gamma) != 1 ||
-    !is.finite(gamma) ||
-    gamma <= 0
-  ) {
-    stop("gamma must be positive", call. = FALSE)
+  if (nu <= 0 || nu > 1 || gamma <= 0) {
+    stop("Invalid OCSVM parameters", call. = FALSE)
   }
 
   K <- gaussian_kernel(x_train, x_train, gamma)
@@ -111,20 +91,20 @@ fit_ocsvm <- function(
   alpha <- solution$alpha
   cap <- solution$cap
   f_train <- solution$gradient
-  eps <- 1e-8
 
+  eps <- 1e-8
   free <- which(alpha > eps & alpha < cap - eps)
 
-  if (length(free) > 0) {
+  if (length(free) > 0L) {
     rho <- mean(f_train[free])
   } else {
     upper <- which(alpha >= cap - eps)
     zero <- which(alpha <= eps)
 
-    if (length(upper) > 0 && length(zero) > 0) {
-      rho <- (max(f_train[upper]) + min(f_train[zero])) / 2
+    rho <- if (length(upper) > 0L && length(zero) > 0L) {
+      (max(f_train[upper]) + min(f_train[zero])) / 2
     } else {
-      rho <- median(f_train[alpha > eps])
+      median(f_train[alpha > eps])
     }
   }
 
@@ -134,7 +114,6 @@ fit_ocsvm <- function(
     support_vectors = x_train[support, , drop = FALSE],
     support_alpha = alpha[support],
     rho = rho,
-    nu = nu,
     gamma = gamma,
     dimension = ncol(x_train),
     kkt_gap = solution$gap,
@@ -160,7 +139,8 @@ score_ocsvm <- function(model, newdata, chunk_size = 2000L) {
       model$gamma
     )
 
-    scores[start:end] <- model$rho - as.numeric(K %*% model$support_alpha)
+    scores[start:end] <- model$rho -
+      as.numeric(K %*% model$support_alpha)
   }
 
   scores
