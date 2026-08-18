@@ -1,25 +1,31 @@
+source("experiments/settings.R")
+
 source("aumvc/input_validation.R")
 source("aumvc/level_set.R")
 source("aumvc/aumvc.R")
+source("aumvc/auemc.R")
 
-set.seed(2027)
+set.seed(experiment_seed(2L))
 
-n_per_cluster <- 100
+cfg <- AIM1_TWO_CLUSTERS
+
+mean_left <- -cfg$cluster_mean
+mean_right <- cfg$cluster_mean
 
 x_train <- rbind(
   matrix(
     rnorm(
-      n_per_cluster * 2,
-      mean = -2,
-      sd = 0.7
+      cfg$n_per_cluster * 2,
+      mean = mean_left,
+      sd = cfg$cluster_sd
     ),
     ncol = 2
   ),
   matrix(
     rnorm(
-      n_per_cluster * 2,
-      mean = 2,
-      sd = 0.7
+      cfg$n_per_cluster * 2,
+      mean = mean_right,
+      sd = cfg$cluster_sd
     ),
     ncol = 2
   )
@@ -28,17 +34,17 @@ x_train <- rbind(
 x_eval <- rbind(
   matrix(
     rnorm(
-      99 * 2,
-      mean = -2,
-      sd = 0.7
+      (cfg$n_per_cluster - 1L) * 2,
+      mean = mean_left,
+      sd = cfg$cluster_sd
     ),
     ncol = 2
   ),
   matrix(
     rnorm(
-      99 * 2,
-      mean = 2,
-      sd = 0.7
+      (cfg$n_per_cluster - 1L) * 2,
+      mean = mean_right,
+      sd = cfg$cluster_sd
     ),
     ncol = 2
   ),
@@ -52,104 +58,97 @@ x_eval <- rbind(
   )
 )
 
-x_train <- validate_reference_inputs(
-  x_train,
-  n_reference = 20000L,
-  n_mc_repetitions = 5L,
-  seed = 2027L
-)
-
 centers <- rbind(
-  c(-2, -2),
-  c(2, 2)
+  c(mean_left, mean_left),
+  c(mean_right, mean_right)
 )
 
 squared_distance <- function(x, center) {
   rowSums(
-    sweep(
-      x,
-      2,
-      center,
-      FUN = "-"
-    )^2
+    sweep(x, 2L, center, "-")^2
   )
 }
 
-correct_score <- function(newdata) {
+normality_score <- function(x) {
   pmax(
-    -squared_distance(
-      newdata,
-      centers[1L, ]
-    ),
-    -squared_distance(
-      newdata,
-      centers[2L, ]
-    )
+    -squared_distance(x, centers[1L, ]),
+    -squared_distance(x, centers[2L, ])
   )
 }
 
-reversed_score <- function(newdata) {
-  -correct_score(newdata)
+anomaly_score <- function(x) {
+  -normality_score(x)
 }
 
 reference <- make_reference(
   x_train,
-  n_reference = 20000L,
-  n_mc_repetitions = 5L,
-  seed = 2027L
+  n_reference = N_REFERENCE,
+  n_mc_repetitions = N_MC_REPETITIONS,
+  seed = experiment_seed(102L)
 )
 
-x_eval <- validate_aumvc_inputs(
-  x_eval,
-  reference,
-  correct_score,
-  "normality",
-  seq(0.9, 0.999, length.out = 100L)
+mv_normality <- aumvc(
+  x_eval = x_eval,
+  reference = reference,
+  score_fun = normality_score,
+  score_direction = "normality",
+  alpha_grid = AUMVC_ALPHA_GRID
 )
 
-validate_scores(
-  correct_score(x_eval),
-  n_expected = nrow(x_eval),
-  name = "correct scores"
+mv_anomaly <- aumvc(
+  x_eval = x_eval,
+  reference = reference,
+  score_fun = anomaly_score,
+  score_direction = "anomaly",
+  alpha_grid = AUMVC_ALPHA_GRID
 )
 
-validate_scores(
-  reversed_score(x_eval),
-  n_expected = nrow(x_eval),
-  name = "reversed scores"
+em_normality <- auemc(
+  x_eval = x_eval,
+  reference = reference,
+  score_fun = normality_score,
+  score_direction = "normality",
+  tau_grid = AUEMC_TAU_GRID
 )
 
-correct <- aumvc(
-  x_eval,
-  reference,
-  correct_score,
-  score_direction = "normality"
+em_anomaly <- auemc(
+  x_eval = x_eval,
+  reference = reference,
+  score_fun = anomaly_score,
+  score_direction = "anomaly",
+  tau_grid = AUEMC_TAU_GRID
 )
 
-reversed <- aumvc(
-  x_eval,
-  reference,
-  reversed_score,
-  score_direction = "normality"
-)
-
-comparison <- data.frame(
-  scoring_rule = c(
-    "correct",
-    "reversed"
-  ),
-  aumvc = c(
-    correct$aumvc,
-    reversed$aumvc
-  ),
-  aumvc_mc_se = c(
-    correct$aumvc_mc_se,
-    reversed$aumvc_mc_se
+print(
+  data.frame(
+    metric = c("AUMVC", "AUEMC"),
+    normality_input = c(
+      mv_normality$aumvc,
+      em_normality$auemc
+    ),
+    anomaly_input = c(
+      mv_anomaly$aumvc,
+      em_anomaly$auemc
+    )
   )
 )
 
-print(comparison)
+stopifnot(
+  isTRUE(
+    all.equal(
+      mv_normality$aumvc,
+      mv_anomaly$aumvc,
+      tolerance = 1e-12
+    )
+  )
+)
 
 stopifnot(
-  correct$aumvc < reversed$aumvc
+  isTRUE(
+    all.equal(
+      em_normality$auemc,
+      em_anomaly$auemc,
+      tolerance = 1e-12
+    )
+  )
 )
