@@ -1,10 +1,13 @@
-SEED <- 1L
+SEED <- 1234L
+N_RUNS <- 10L
 
 N_REFERENCE <- 20000L
 N_MC_REPETITIONS <- 5L
 
 AUMVC_ALPHA_GRID <- seq(0.9, 0.999, by = 0.0001)
 AUEMC_TAU_GRID <- c(0, 10^seq(-6, 6, length.out = 800))
+
+CONCORDANCE_TOLERANCE <- 1e-8
 
 OCSVM_NU <- 0.5
 LOF_K <- 20L
@@ -41,6 +44,10 @@ AIM2_SPLIT_COUNTS <- list(
   smtp = c(1500L, 2000L, 2000L, 89656L),
   wilt = c(1200L, 1200L, 1200L, 1239L)
 )
+
+run_seed <- function(run) {
+  SEED + (as.integer(run) - 1L) * 1000L
+}
 
 experiment_seed <- function(offset = 0L) {
   SEED + as.integer(offset)
