@@ -1,54 +1,94 @@
-SEED <- 1111L
-N_RUNS <- 10L
-
-N_REFERENCE <- 20000L
-N_MC_REPETITIONS <- 5L
-
-AUMVC_ALPHA_GRID <- seq(0.9, 0.999, by = 0.0001)
-AUEMC_TAU_GRID <- c(0, 10^seq(-6, 6, length.out = 800))
-
-CONCORDANCE_TOLERANCE <- 1e-8
-
-OCSVM_NU <- 0.5
-LOF_K <- 20L
-
-IFOREST_NTREES <- 100L
-IFOREST_SAMPLE_SIZE <- 256L
-
-AIM1_ONE_CLUSTER <- list(
-  n_train = 200L,
-  n_eval = 200L,
-  n_anomaly = 2L,
-  anomaly_mean = 5,
-  anomaly_sd = 0.3
+AIM1_SETTINGS <- list(
+  seed = 1111L,
+  n_reference = 20000L,
+  n_mc_repetitions = 5L,
+  aumvc_alpha_grid = seq(0.9, 0.999, by = 0.0001),
+  auemc_tau_grid = c(0, 10^seq(-6, 6, length.out = 800)),
+  one_cluster = list(
+    n_train = 200L,
+    n_eval = 200L,
+    n_anomaly = 2L,
+    anomaly_mean = 5,
+    anomaly_sd = 0.3
+  ),
+  two_clusters = list(
+    n_per_cluster = 100L,
+    cluster_mean = 2,
+    cluster_sd = 0.7
+  )
 )
 
-AIM1_TWO_CLUSTERS <- list(
-  n_per_cluster = 100L,
-  cluster_mean = 2,
-  cluster_sd = 0.7
+AIM2_SETTINGS <- list(
+  seed = 1111L,
+  n_runs = 5L,
+  n_reference = 20000L,
+  n_mc_repetitions = 5L,
+  aumvc_alpha_grid = seq(0.9, 0.999, by = 0.0001),
+  auemc_tau_grid = c(0, 10^seq(-6, 6, length.out = 800)),
+  concordance_tolerance = 1e-8,
+  detectors = list(
+    ocsvm = list(
+      nu = 0.5
+    ),
+    lof = list(
+      k = 20L
+    ),
+    iforest = list(
+      ntrees = 100L,
+      sample_size = 256L
+    )
+  ),
+  synthetic = list(
+    n_normal = 1800L,
+    n_anomaly = 200L,
+    radius_min = 1.8,
+    radius_max = 3.2
+  ),
+  split_counts = list(
+    synthetic = c(500L, 400L, 500L, 600L),
+    adult = c(1500L, 2000L, 2000L, 20000L),
+    http = c(1500L, 2000L, 2000L, 50000L),
+    pima = c(200L, 150L, 250L, 168L),
+    smtp = c(1500L, 2000L, 2000L, 89656L),
+    wilt = c(1200L, 1200L, 1200L, 1239L)
+  )
 )
 
-AIM2_SYNTHETIC <- list(
-  n_normal = 1800L,
-  n_anomaly = 200L,
-  radius_min = 1.8,
-  radius_max = 3.2
+AIM3_SETTINGS <- list(
+  seed = 1111L,
+  synthetic = list(
+    n = 1000L,
+    ambient_dim = 200L,
+    intrinsic_dims = c(3L, 5L, 10L),
+    snr_levels = c(1, 5, 10),
+    truth_functions = c("polynomial", "periodic"),
+    n_distributional = 50L,
+    n_structural = 50L,
+    distributional_tail = c(0.995, 0.9995),
+    structural_shift = 3
+  ),
+  detector = list(
+    name = "OCSVM",
+    nu = 0.5
+  ),
+  goix = list(
+    n_subsets = 50L,
+    subset_dim = 5L
+  ),
+  embeddings = c("MDS", "Isomap"),
+  aumvc_alpha_grid = seq(0.9, 0.999, by = 0.0001),
+  n_mc_repetitions = 5L,
+  reference_density = NULL
 )
 
-AIM2_SPLIT_COUNTS <- list(
-  synthetic = c(500L, 400L, 500L, 600L),
-  adult = c(1500L, 2000L, 2000L, 20000L),
-  http = c(1500L, 2000L, 2000L, 50000L),
-  pima = c(200L, 150L, 250L, 168L),
-  smtp = c(1500L, 2000L, 2000L, 89656L),
-  wilt = c(1200L, 1200L, 1200L, 1239L)
+AIM4_SETTINGS <- list(
+  seed = 1111L
 )
 
-run_seed <- function(run) {
-  SEED + (as.integer(run) - 1L) * 1000L
+aim_seed <- function(settings, offset = 0L) {
+  settings$seed + as.integer(offset)
 }
 
-experiment_seed <- function(offset = 0L) {
-  SEED + as.integer(offset)
+aim_run_seed <- function(settings, run) {
+  settings$seed + (as.integer(run) - 1L) * 1000L
 }
