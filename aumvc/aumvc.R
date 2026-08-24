@@ -3,7 +3,8 @@ aumvc_from_scores <- function(
     reference_scores,
     box_volume,
     score_direction = "normality",
-    alpha_grid = seq(0.9, 0.999, by = 0.0001)
+    alpha_grid = seq(0.9, 0.999, by = 0.0001),
+    box_log_volume = NULL
 ) {
   alpha_grid <- validate_alpha_grid(alpha_grid)
 
@@ -29,6 +30,12 @@ aumvc_from_scores <- function(
     numeric(1)
   )
 
+  volume <- scale_occupancy_volume(
+    occupancy,
+    box_volume,
+    box_log_volume
+  )
+
   curve <- data.frame(
     alpha = alpha_grid,
     threshold = threshold,
@@ -37,7 +44,7 @@ aumvc_from_scores <- function(
       function(u) mean(evaluation_scores >= u),
       numeric(1)
     ),
-    volume = box_volume * occupancy,
+    volume = volume,
     volume_normalized = occupancy
   )
 
@@ -69,6 +76,7 @@ aumvc <- function(
   )
 
   reference_scores <- score_reference_repetitions(reference, score_fun)
+  box_log_volume <- reference$box$log_volume
 
   repetitions <- lapply(
     reference_scores,
@@ -78,7 +86,8 @@ aumvc <- function(
         scores,
         reference$box$volume,
         score_direction,
-        alpha_grid
+        alpha_grid,
+        box_log_volume
       )
     }
   )
@@ -95,20 +104,48 @@ aumvc <- function(
     lapply(repetitions, function(x) x$mv_curve$volume)
   )
 
+  normalized_matrix <- do.call(
+    cbind,
+    lapply(repetitions, function(x) x$mv_curve$volume_normalized)
+  )
+
   curve <- repetitions[[1L]]$mv_curve
   curve$volume <- rowMeans(volume_matrix)
-  curve$volume_normalized <- curve$volume / reference$box$volume
+  curve$volume_normalized <- rowMeans(normalized_matrix)
 
   if (length(values) > 1L) {
-    curve$volume_mc_se <- apply(volume_matrix, 1L, sd) /
-      sqrt(length(values))
+    curve$volume_mc_se <- apply(
+      volume_matrix,
+      1L,
+      function(x) {
+        if (!all(is.finite(x))) return(NA_real_)
+        sd(x) / sqrt(length(x))
+      }
+    )
 
-    mc_sd <- sd(values)
-    mc_se <- mc_sd / sqrt(length(values))
+    curve$volume_normalized_mc_se <- apply(
+      normalized_matrix,
+      1L,
+      sd
+    ) / sqrt(length(values))
+
+    if (all(is.finite(values))) {
+      mc_sd <- sd(values)
+      mc_se <- mc_sd / sqrt(length(values))
+    } else {
+      mc_sd <- NA_real_
+      mc_se <- NA_real_
+    }
+
+    normalized_mc_sd <- sd(normalized)
+    normalized_mc_se <- normalized_mc_sd / sqrt(length(normalized))
   } else {
     curve$volume_mc_se <- NA_real_
+    curve$volume_normalized_mc_se <- NA_real_
     mc_sd <- NA_real_
     mc_se <- NA_real_
+    normalized_mc_sd <- NA_real_
+    normalized_mc_se <- NA_real_
   }
 
   list(
@@ -116,6 +153,8 @@ aumvc <- function(
     aumvc = mean(values),
     aumvc_normalized = mean(normalized),
     aumvc_mc_sd = mc_sd,
-    aumvc_mc_se = mc_se
+    aumvc_mc_se = mc_se,
+    aumvc_normalized_mc_sd = normalized_mc_sd,
+    aumvc_normalized_mc_se = normalized_mc_se
   )
 }

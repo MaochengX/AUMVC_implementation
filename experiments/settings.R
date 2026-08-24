@@ -20,23 +20,16 @@ AIM1_SETTINGS <- list(
 
 AIM2_SETTINGS <- list(
   seed = 1111L,
-  n_runs = 5L,
+  n_runs = 2L,
   n_reference = 20000L,
   n_mc_repetitions = 5L,
   aumvc_alpha_grid = seq(0.9, 0.999, by = 0.0001),
   auemc_tau_grid = c(0, 10^seq(-6, 6, length.out = 800)),
   concordance_tolerance = 1e-8,
   detectors = list(
-    ocsvm = list(
-      nu = 0.5
-    ),
-    lof = list(
-      k = 20L
-    ),
-    iforest = list(
-      ntrees = 100L,
-      sample_size = 256L
-    )
+    ocsvm = list(nu = 0.5),
+    lof = list(k = 20L),
+    iforest = list(ntrees = 100L, sample_size = 256L)
   ),
   synthetic = list(
     n_normal = 1800L,
@@ -56,16 +49,26 @@ AIM2_SETTINGS <- list(
 
 AIM3_SETTINGS <- list(
   seed = 1111L,
+  n_runs = 5L,
   synthetic = list(
     n = 1000L,
     ambient_dim = 200L,
     intrinsic_dims = c(3L, 5L, 10L),
     snr_levels = c(1, 5, 10),
-    truth_functions = c("polynomial", "periodic"),
+    truth_functions = c(
+      "polynomial_interaction",
+      "oscillatory_local"
+    ),
     n_distributional = 50L,
     n_structural = 50L,
     distributional_tail = c(0.995, 0.9995),
     structural_shift = 3
+  ),
+  split_counts = c(
+    embedding = 250L,
+    detector_train = 250L,
+    reference = 250L,
+    evaluation = 250L
   ),
   detector = list(
     name = "OCSVM",
@@ -75,10 +78,19 @@ AIM3_SETTINGS <- list(
     n_subsets = 50L,
     subset_dim = 5L
   ),
-  embeddings = c("MDS", "Isomap"),
-  aumvc_alpha_grid = seq(0.9, 0.999, by = 0.0001),
-  n_mc_repetitions = 5L,
-  reference_density = NULL
+  embedding = list(
+    methods = c("mds", "isomap"),
+    isomap_neighbors = 10L,
+    interpolation_neighbors = 20L,
+    interpolation_ridge = 1e-3
+  ),
+  reference = list(
+    points_per_volume = 1000,
+    min_points = 20000L,
+    max_points = 100000L,
+    n_mc_repetitions = 5L
+  ),
+  aumvc_alpha_grid = seq(0.9, 0.999, by = 0.0001)
 )
 
 AIM4_SETTINGS <- list(

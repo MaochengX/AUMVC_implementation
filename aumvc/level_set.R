@@ -23,11 +23,19 @@ fit_reference_box <- function(x_train) {
     stop("The reference split has a constant coordinate", call. = FALSE)
   }
 
+  volume <- prod(width)
+  log_volume <- sum(log(width))
+
+  if (!is.finite(volume) && log_volume <= log(.Machine$double.xmax)) {
+    volume <- exp(log_volume)
+  }
+
   list(
     lower = as.numeric(lower),
     upper = as.numeric(upper),
     width = as.numeric(width),
-    volume = prod(width),
+    volume = volume,
+    log_volume = log_volume,
     dimension = ncol(x_train)
   )
 }
@@ -80,10 +88,35 @@ score_reference_repetitions <- function(reference, score_fun) {
   )
 }
 
+scale_occupancy_volume <- function(occupancy, box_volume, box_log_volume = NULL) {
+  occupancy <- as.numeric(occupancy)
+
+  if (is.finite(box_volume)) {
+    return(box_volume * occupancy)
+  }
+
+  if (is.null(box_log_volume)) {
+    box_log_volume <- log(box_volume)
+  }
+
+  out <- numeric(length(occupancy))
+  positive <- occupancy > 0
+
+  if (!any(positive)) return(out)
+
+  log_values <- box_log_volume + log(occupancy[positive])
+  finite <- log_values <= log(.Machine$double.xmax)
+
+  out[which(positive)[finite]] <- exp(log_values[finite])
+  out[which(positive)[!finite]] <- Inf
+  out
+}
+
 level_set_table <- function(
     evaluation_scores,
     reference_scores,
-    box_volume
+    box_volume,
+    box_log_volume = NULL
 ) {
   thresholds <- sort(
     unique(c(evaluation_scores, reference_scores)),
@@ -107,6 +140,10 @@ level_set_table <- function(
     threshold = thresholds,
     mass = mass,
     occupancy = occupancy,
-    volume = box_volume * occupancy
+    volume = scale_occupancy_volume(
+      occupancy,
+      box_volume,
+      box_log_volume
+    )
   )
 }
