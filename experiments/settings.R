@@ -24,7 +24,6 @@ AIM2_SETTINGS <- list(
   n_reference = 20000L,
   n_mc_repetitions = 5L,
   aumvc_alpha_grid = seq(0.9, 0.999, by = 0.0001),
-  auemc_tau_grid = c(0, 10^seq(-6, 6, length.out = 800)),
   concordance_tolerance = 1e-8,
   detectors = list(
     ocsvm = list(nu = 0.5),
@@ -55,10 +54,7 @@ AIM3_SETTINGS <- list(
     ambient_dim = 200L,
     intrinsic_dims = c(3L, 5L, 10L),
     snr_levels = c(1, 5, 10),
-    truth_functions = c(
-      "polynomial_interaction",
-      "oscillatory_local"
-    ),
+    truth_functions = c("polynomial_interaction", "oscillatory_local"),
     n_distributional = 50L,
     n_structural = 50L,
     distributional_tail = c(0.995, 0.9995),
@@ -70,14 +66,8 @@ AIM3_SETTINGS <- list(
     reference = 250L,
     evaluation = 250L
   ),
-  detector = list(
-    name = "OCSVM",
-    nu = 0.5
-  ),
-  goix = list(
-    n_subsets = 50L,
-    subset_dim = 5L
-  ),
+  detector = list(nu = 0.5),
+  goix = list(n_subsets = 50L, subset_dim = 5L),
   embedding = list(
     methods = c("mds", "isomap"),
     isomap_neighbors = 10L,
@@ -93,14 +83,12 @@ AIM3_SETTINGS <- list(
   aumvc_alpha_grid = seq(0.9, 0.999, by = 0.0001)
 )
 
-AIM4_SETTINGS <- list(
-  seed = 1111L
-)
+AIM4_SETTINGS <- list(seed = 1111L)
 
-aim_seed <- function(settings, offset = 0L) {
+experiment_seed <- function(settings, offset = 0L) {
   settings$seed + as.integer(offset)
 }
 
-aim_run_seed <- function(settings, run) {
-  settings$seed + (as.integer(run) - 1L) * 1000L
+experiment_run_seed <- function(settings, run, offset = 0L) {
+  settings$seed + (as.integer(run) - 1L) * 1000L + as.integer(offset)
 }

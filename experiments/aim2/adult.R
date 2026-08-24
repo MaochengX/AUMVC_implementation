@@ -1,10 +1,10 @@
 source("experiments/aim2/validation_agianst_labels.R")
+settings <- AIM2_SETTINGS
 
 columns <- c(
   "age", "workclass", "fnlwgt", "education", "education_num",
   "marital_status", "occupation", "relationship", "race", "sex",
-  "capital_gain", "capital_loss", "hours_per_week",
-  "native_country", "income"
+  "capital_gain", "capital_loss", "hours_per_week", "native_country", "income"
 )
 
 read_adult <- function(path) {
@@ -18,7 +18,6 @@ read_adult <- function(path) {
     quote = "",
     stringsAsFactors = FALSE
   )
-
   data$income <- sub("\\.$", "", trimws(data$income))
   data
 }
@@ -27,15 +26,12 @@ data <- rbind(
   read_adult("dataset/adult/adult.data"),
   read_adult("dataset/adult/adult.test")
 )
-
-features <- c(
-  "age", "fnlwgt", "education_num",
-  "capital_gain", "capital_loss", "hours_per_week"
-)
+features <- c("age", "fnlwgt", "education_num", "capital_gain", "capital_loss", "hours_per_week")
 
 run_aim2_dataset(
-  x = as.matrix(data[, features]),
-  labels = as.integer(data$income == ">50K"),
-  dataset = "Adult",
-  counts = AIM2_SETTINGS$split_counts$adult
+  as.matrix(data[, features, drop = FALSE]),
+  as.integer(data$income == ">50K"),
+  "Adult",
+  settings$split_counts$adult,
+  settings
 )

@@ -7,43 +7,19 @@ aumvc_from_scores <- function(
     box_log_volume = NULL
 ) {
   alpha_grid <- validate_alpha_grid(alpha_grid)
-
-  evaluation_scores <- orient_scores(
-    validate_scores(evaluation_scores),
-    score_direction
-  )
-
-  reference_scores <- orient_scores(
-    validate_scores(reference_scores),
-    score_direction
-  )
+  evaluation_scores <- orient_scores(validate_scores(evaluation_scores), score_direction)
+  reference_scores <- orient_scores(validate_scores(reference_scores), score_direction)
 
   n <- length(evaluation_scores)
   ordered_scores <- sort(evaluation_scores, decreasing = TRUE)
-
-  k <- pmin(n, ceiling(alpha_grid * n))
-  threshold <- ordered_scores[k]
-
-  occupancy <- vapply(
-    threshold,
-    function(u) mean(reference_scores >= u),
-    numeric(1)
-  )
-
-  volume <- scale_occupancy_volume(
-    occupancy,
-    box_volume,
-    box_log_volume
-  )
+  threshold <- ordered_scores[pmin(n, ceiling(alpha_grid * n))]
+  occupancy <- vapply(threshold, function(u) mean(reference_scores >= u), numeric(1))
+  volume <- scale_occupancy_volume(occupancy, box_volume, box_log_volume)
 
   curve <- data.frame(
     alpha = alpha_grid,
     threshold = threshold,
-    empirical_mass = vapply(
-      threshold,
-      function(u) mean(evaluation_scores >= u),
-      numeric(1)
-    ),
+    empirical_mass = vapply(threshold, function(u) mean(evaluation_scores >= u), numeric(1)),
     volume = volume,
     volume_normalized = occupancy
   )
@@ -51,10 +27,7 @@ aumvc_from_scores <- function(
   list(
     mv_curve = curve,
     aumvc = trapezoid_area(curve$alpha, curve$volume),
-    aumvc_normalized = trapezoid_area(
-      curve$alpha,
-      curve$volume_normalized
-    )
+    aumvc_normalized = trapezoid_area(curve$alpha, curve$volume_normalized)
   )
 }
 
@@ -66,44 +39,24 @@ aumvc <- function(
     alpha_grid = seq(0.9, 0.999, by = 0.0001)
 ) {
   x_eval <- validate_matrix(x_eval, "x_eval")
-
   if (!is.function(score_fun)) stop("score_fun must be a function", call. = FALSE)
 
-  evaluation_scores <- validate_scores(
-    score_fun(x_eval),
-    nrow(x_eval),
-    "evaluation_scores"
-  )
-
+  evaluation_scores <- validate_scores(score_fun(x_eval), nrow(x_eval), "evaluation_scores")
   reference_scores <- score_reference_repetitions(reference, score_fun)
-  box_log_volume <- reference$box$log_volume
-
-  repetitions <- lapply(
-    reference_scores,
-    function(scores) {
-      aumvc_from_scores(
-        evaluation_scores,
-        scores,
-        reference$box$volume,
-        score_direction,
-        alpha_grid,
-        box_log_volume
-      )
-    }
-  )
+  repetitions <- lapply(reference_scores, function(scores) {
+    aumvc_from_scores(
+      evaluation_scores,
+      scores,
+      reference$box$volume,
+      score_direction,
+      alpha_grid,
+      reference$box$log_volume
+    )
+  })
 
   values <- vapply(repetitions, function(x) x$aumvc, numeric(1))
-  normalized <- vapply(
-    repetitions,
-    function(x) x$aumvc_normalized,
-    numeric(1)
-  )
-
-  volume_matrix <- do.call(
-    cbind,
-    lapply(repetitions, function(x) x$mv_curve$volume)
-  )
-
+  normalized <- vapply(repetitions, function(x) x$aumvc_normalized, numeric(1))
+  volume_matrix <- do.call(cbind, lapply(repetitions, function(x) x$mv_curve$volume))
   normalized_matrix <- do.call(
     cbind,
     lapply(repetitions, function(x) x$mv_curve$volume_normalized)
@@ -114,38 +67,18 @@ aumvc <- function(
   curve$volume_normalized <- rowMeans(normalized_matrix)
 
   if (length(values) > 1L) {
-    curve$volume_mc_se <- apply(
-      volume_matrix,
-      1L,
-      function(x) {
-        if (!all(is.finite(x))) return(NA_real_)
-        sd(x) / sqrt(length(x))
-      }
-    )
-
-    curve$volume_normalized_mc_se <- apply(
-      normalized_matrix,
-      1L,
-      sd
-    ) / sqrt(length(values))
-
-    if (all(is.finite(values))) {
-      mc_sd <- sd(values)
-      mc_se <- mc_sd / sqrt(length(values))
-    } else {
-      mc_sd <- NA_real_
-      mc_se <- NA_real_
-    }
-
+    curve$volume_mc_se <- apply(volume_matrix, 1L, function(x) {
+      if (all(is.finite(x))) sd(x) / sqrt(length(x)) else NA_real_
+    })
+    curve$volume_normalized_mc_se <- apply(normalized_matrix, 1L, sd) / sqrt(length(values))
+    mc_sd <- if (all(is.finite(values))) sd(values) else NA_real_
+    mc_se <- if (is.finite(mc_sd)) mc_sd / sqrt(length(values)) else NA_real_
     normalized_mc_sd <- sd(normalized)
     normalized_mc_se <- normalized_mc_sd / sqrt(length(normalized))
   } else {
     curve$volume_mc_se <- NA_real_
     curve$volume_normalized_mc_se <- NA_real_
-    mc_sd <- NA_real_
-    mc_se <- NA_real_
-    normalized_mc_sd <- NA_real_
-    normalized_mc_se <- NA_real_
+    mc_sd <- mc_se <- normalized_mc_sd <- normalized_mc_se <- NA_real_
   }
 
   list(

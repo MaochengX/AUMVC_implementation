@@ -1,44 +1,25 @@
 source("experiments/aim2/validation_agianst_labels.R")
+settings <- AIM2_SETTINGS
+set.seed(settings$seed)
 
-set.seed(AIM2_SETTINGS$seed)
-
-cfg <- AIM2_SETTINGS$synthetic
-
-x_normal <- matrix(
-  rnorm(cfg$n_normal * 2),
-  ncol = 2
-)
-
-angle <- runif(
-  cfg$n_anomaly,
-  0,
-  2 * pi
-)
-
+x_normal <- matrix(rnorm(settings$synthetic$n_normal * 2), ncol = 2)
+angle <- runif(settings$synthetic$n_anomaly, 0, 2 * pi)
 radius <- runif(
-  cfg$n_anomaly,
-  cfg$radius_min,
-  cfg$radius_max
+  settings$synthetic$n_anomaly,
+  settings$synthetic$radius_min,
+  settings$synthetic$radius_max
 )
-
-x_anomaly <- cbind(
-  radius * cos(angle),
-  radius * sin(angle)
-)
-
-x <- rbind(
-  x_normal,
-  x_anomaly
-)
-
+x_anomaly <- cbind(radius * cos(angle), radius * sin(angle))
+x <- rbind(x_normal, x_anomaly)
 labels <- c(
-  rep(0L, cfg$n_normal),
-  rep(1L, cfg$n_anomaly)
+  rep(0L, settings$synthetic$n_normal),
+  rep(1L, settings$synthetic$n_anomaly)
 )
 
 run_aim2_dataset(
-  x = x,
-  labels = labels,
-  dataset = "Synthetic",
-  counts = AIM2_SETTINGS$split_counts$synthetic
+  x,
+  labels,
+  "Synthetic",
+  settings$split_counts$synthetic,
+  settings
 )
