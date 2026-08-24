@@ -1,8 +1,8 @@
 source("experiments/aim2/validation_agianst_labels.R")
 
-set.seed(SEED)
+set.seed(AIM2_SETTINGS$seed)
 
-cfg <- AIM2_SYNTHETIC
+cfg <- AIM2_SETTINGS$synthetic
 
 x_normal <- matrix(
   rnorm(cfg$n_normal * 2),
@@ -40,5 +40,5 @@ run_aim2_dataset(
   x = x,
   labels = labels,
   dataset = "Synthetic",
-  counts = AIM2_SPLIT_COUNTS$synthetic
+  counts = AIM2_SETTINGS$split_counts$synthetic
 )

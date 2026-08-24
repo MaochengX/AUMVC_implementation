@@ -22,16 +22,16 @@ if (any(!file.exists(paths))) {
 
 runs <- lapply(paths, readRDS)
 
-if (any(vapply(runs, function(x) x$n_runs != N_RUNS, logical(1)))) {
+if (any(vapply(runs, function(x) x$n_runs != AIM2_SETTINGS$n_runs, logical(1)))) {
   stop(
-    "Saved results do not use the current N_RUNS.",
+    "Saved results do not use the current Aim 2 run count.",
     call. = FALSE
   )
 }
 
-if (any(vapply(runs, function(x) x$base_seed != SEED, logical(1)))) {
+if (any(vapply(runs, function(x) x$base_seed != AIM2_SETTINGS$seed, logical(1)))) {
   stop(
-    "Saved results do not use the current SEED.",
+    "Saved results do not use the current Aim 2 seed.",
     call. = FALSE
   )
 }
@@ -84,7 +84,7 @@ overall <- do.call(
 
 cat(
   "Aim 2 summary - ",
-  N_RUNS,
+  AIM2_SETTINGS$n_runs,
   " runs per dataset\n\n",
   sep = ""
 )

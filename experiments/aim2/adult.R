@@ -37,5 +37,5 @@ run_aim2_dataset(
   x = as.matrix(data[, features]),
   labels = as.integer(data$income == ">50K"),
   dataset = "Adult",
-  counts = AIM2_SPLIT_COUNTS$adult
+  counts = AIM2_SETTINGS$split_counts$adult
 )

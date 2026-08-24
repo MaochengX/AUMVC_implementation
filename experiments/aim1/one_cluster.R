@@ -5,9 +5,9 @@ source("aumvc/level_set.R")
 source("aumvc/aumvc.R")
 source("aumvc/auemc.R")
 
-set.seed(experiment_seed(1L))
+set.seed(aim_seed(AIM1_SETTINGS, 1L))
 
-cfg <- AIM1_ONE_CLUSTER
+cfg <- AIM1_SETTINGS$one_cluster
 
 x_train <- matrix(
   rnorm(cfg$n_train * 2),
@@ -46,9 +46,9 @@ score_fun <- function(x) {
 
 reference <- make_reference(
   x_train,
-  n_reference = N_REFERENCE,
-  n_mc_repetitions = N_MC_REPETITIONS,
-  seed = experiment_seed(101L)
+  n_reference = AIM1_SETTINGS$n_reference,
+  n_mc_repetitions = AIM1_SETTINGS$n_mc_repetitions,
+  seed = aim_seed(AIM1_SETTINGS, 101L)
 )
 
 mv <- aumvc(
@@ -56,7 +56,7 @@ mv <- aumvc(
   reference = reference,
   score_fun = score_fun,
   score_direction = "normality",
-  alpha_grid = AUMVC_ALPHA_GRID
+  alpha_grid = AIM1_SETTINGS$aumvc_alpha_grid
 )
 
 em <- auemc(
@@ -64,7 +64,7 @@ em <- auemc(
   reference = reference,
   score_fun = score_fun,
   score_direction = "normality",
-  tau_grid = AUEMC_TAU_GRID
+  tau_grid = AIM1_SETTINGS$auemc_tau_grid
 )
 
 print(

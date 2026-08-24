@@ -25,5 +25,5 @@ run_aim2_dataset(
     tolower(trimws(data$class)) == "w"
   ),
   dataset = "Wilt",
-  counts = AIM2_SPLIT_COUNTS$wilt
+  counts = AIM2_SETTINGS$split_counts$wilt
 )

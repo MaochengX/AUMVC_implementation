@@ -7,5 +7,5 @@ run_aim2_dataset(
   x = as.matrix(data[, features, drop = FALSE]),
   labels = data$label,
   dataset = "Pima",
-  counts = AIM2_SPLIT_COUNTS$pima
+  counts = AIM2_SETTINGS$split_counts$pima
 )

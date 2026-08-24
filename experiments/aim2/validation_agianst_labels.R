@@ -93,7 +93,7 @@ pr_auc_score <- function(labels, scores) {
 compare_pair <- function(
     aumvc_difference,
     target_difference,
-    tolerance = CONCORDANCE_TOLERANCE
+    tolerance = AIM2_SETTINGS$concordance_tolerance
 ) {
   if (abs(target_difference) <= tolerance) return(NA)
   if (abs(aumvc_difference) <= tolerance) return(FALSE)
@@ -159,15 +159,15 @@ fit_aim2_models <- function(x_train, seed) {
   models <- list(
     OCSVM = fit_ocsvm(
       x_train,
-      nu = OCSVM_NU,
+      nu = AIM2_SETTINGS$detectors$ocsvm$nu,
       gamma = 1 / ncol(x_train)
     ),
-    LOF = fit_lof(x_train, k = LOF_K),
+    LOF = fit_lof(x_train, k = AIM2_SETTINGS$detectors$lof$k),
     Isolation_Forest = fit_isolation_forest(
       x_train,
-      ntrees = IFOREST_NTREES,
+      ntrees = AIM2_SETTINGS$detectors$iforest$ntrees,
       sample_size = min(
-        IFOREST_SAMPLE_SIZE,
+        AIM2_SETTINGS$detectors$iforest$sample_size,
         nrow(x_train)
       ),
       seed = seed + 200L
@@ -220,7 +220,7 @@ run_aim2_once <- function(x, labels, counts, seed) {
   labels_label <- labels[split$label_eval]
 
   if (
-    nrow(x_train) <= LOF_K ||
+    nrow(x_train) <= AIM2_SETTINGS$detectors$lof$k ||
     nrow(x_reference) < 2L ||
     nrow(x_aumvc) < 2L ||
     length(unique(labels_label)) != 2L
@@ -237,8 +237,8 @@ run_aim2_once <- function(x, labels, counts, seed) {
 
   reference <- make_reference(
     x_reference,
-    n_reference = N_REFERENCE,
-    n_mc_repetitions = N_MC_REPETITIONS,
+    n_reference = AIM2_SETTINGS$n_reference,
+    n_mc_repetitions = AIM2_SETTINGS$n_mc_repetitions,
     seed = seed + 100L
   )
 
@@ -258,7 +258,7 @@ run_aim2_once <- function(x, labels, counts, seed) {
           reference = reference,
           score_fun = score_fun,
           score_direction = "anomaly",
-          alpha_grid = AUMVC_ALPHA_GRID
+          alpha_grid = AIM2_SETTINGS$aumvc_alpha_grid
         )
 
         data.frame(
@@ -403,13 +403,13 @@ run_aim2_dataset <- function(x, labels, dataset, counts) {
   }
 
   run_results <- lapply(
-    seq_len(N_RUNS),
+    seq_len(AIM2_SETTINGS$n_runs),
     function(run) {
       run_aim2_once(
         x = x,
         labels = labels,
         counts = counts,
-        seed = run_seed(run)
+        seed = aim_run_seed(AIM2_SETTINGS, run)
       )
     }
   )
@@ -419,8 +419,8 @@ run_aim2_dataset <- function(x, labels, dataset, counts) {
 
   output <- list(
     dataset = dataset,
-    n_runs = N_RUNS,
-    base_seed = SEED,
+    n_runs = AIM2_SETTINGS$n_runs,
+    base_seed = AIM2_SETTINGS$seed,
     run_results = run_results,
     detector_results = detector_runs$combined,
     detector_summary = detector_runs$summary,
@@ -457,7 +457,7 @@ run_aim2_dataset <- function(x, labels, dataset, counts) {
     )
   )
 
-  cat(dataset, " - ", N_RUNS, " runs\n\n", sep = "")
+  cat(dataset, " - ", AIM2_SETTINGS$n_runs, " runs\n\n", sep = "")
   print(display, row.names = FALSE)
 
   cat("\n")

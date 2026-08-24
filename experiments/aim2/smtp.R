@@ -7,5 +7,5 @@ run_aim2_dataset(
   x = as.matrix(data[, features, drop = FALSE]),
   labels = data$label,
   dataset = "SMTP",
-  counts = AIM2_SPLIT_COUNTS$smtp
+  counts = AIM2_SETTINGS$split_counts$smtp
 )

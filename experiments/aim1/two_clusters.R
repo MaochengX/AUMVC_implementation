@@ -5,9 +5,9 @@ source("aumvc/level_set.R")
 source("aumvc/aumvc.R")
 source("aumvc/auemc.R")
 
-set.seed(experiment_seed(2L))
+set.seed(aim_seed(AIM1_SETTINGS, 2L))
 
-cfg <- AIM1_TWO_CLUSTERS
+cfg <- AIM1_SETTINGS$two_clusters
 
 mean_left <- -cfg$cluster_mean
 mean_right <- cfg$cluster_mean
@@ -82,9 +82,9 @@ anomaly_score <- function(x) {
 
 reference <- make_reference(
   x_train,
-  n_reference = N_REFERENCE,
-  n_mc_repetitions = N_MC_REPETITIONS,
-  seed = experiment_seed(102L)
+  n_reference = AIM1_SETTINGS$n_reference,
+  n_mc_repetitions = AIM1_SETTINGS$n_mc_repetitions,
+  seed = aim_seed(AIM1_SETTINGS, 102L)
 )
 
 mv_normality <- aumvc(
@@ -92,7 +92,7 @@ mv_normality <- aumvc(
   reference = reference,
   score_fun = normality_score,
   score_direction = "normality",
-  alpha_grid = AUMVC_ALPHA_GRID
+  alpha_grid = AIM1_SETTINGS$aumvc_alpha_grid
 )
 
 mv_anomaly <- aumvc(
@@ -100,7 +100,7 @@ mv_anomaly <- aumvc(
   reference = reference,
   score_fun = anomaly_score,
   score_direction = "anomaly",
-  alpha_grid = AUMVC_ALPHA_GRID
+  alpha_grid = AIM1_SETTINGS$aumvc_alpha_grid
 )
 
 em_normality <- auemc(
@@ -108,7 +108,7 @@ em_normality <- auemc(
   reference = reference,
   score_fun = normality_score,
   score_direction = "normality",
-  tau_grid = AUEMC_TAU_GRID
+  tau_grid = AIM1_SETTINGS$auemc_tau_grid
 )
 
 em_anomaly <- auemc(
@@ -116,7 +116,7 @@ em_anomaly <- auemc(
   reference = reference,
   score_fun = anomaly_score,
   score_direction = "anomaly",
-  tau_grid = AUEMC_TAU_GRID
+  tau_grid = AIM1_SETTINGS$auemc_tau_grid
 )
 
 print(
