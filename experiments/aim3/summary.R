@@ -63,7 +63,15 @@ summary_rows <- lapply(
   }
 )
 
+summary_table <- do.call(rbind, summary_rows)
+
+write.csv(
+  summary_table,
+  "experiments/aim3/results/summary.csv",
+  row.names = FALSE
+)
+
 print(
-  do.call(rbind, summary_rows),
+  summary_table,
   row.names = FALSE
 )
