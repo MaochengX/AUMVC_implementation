@@ -49,7 +49,7 @@ AIM2_SETTINGS <- list(
 
 AIM3_SETTINGS <- list(
   seed = 1111L,
-  n_runs = 5L,
+  n_runs = 1L,
   synthetic = list(
     n = 1000L,
     ambient_dim = 200L,
