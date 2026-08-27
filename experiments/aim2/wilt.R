@@ -7,7 +7,7 @@ data <- rbind(
 )
 features <- c("GLCM_pan", "Mean_Green", "Mean_Red", "Mean_NIR", "SD_pan")
 
-run_aim2_dataset(
+aim2_run_dataset(
   as.matrix(data[, features, drop = FALSE]),
   as.integer(tolower(trimws(data$class)) == "w"),
   "Wilt",

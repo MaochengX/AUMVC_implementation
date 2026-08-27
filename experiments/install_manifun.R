@@ -1,16 +1,13 @@
 cran_repo <- "https://cloud.r-project.org"
 
 if (!requireNamespace("pak", quietly = TRUE)) {
-  install.packages(
-    "pak",
-    repos = cran_repo
-  )
+  install.packages("pak", repos = cran_repo)
 }
 
 packages <- c(
   "Rtsne",
   "data.table",
-  "diffusionMap",
+  "bioc::diffusionMap",
   "ggplot2",
   "igraph",
   "shiny",
@@ -25,13 +22,9 @@ if (!requireNamespace("manifun", quietly = TRUE)) {
   stop("manifun installation failed.", call. = FALSE)
 }
 
-required_functions <- c(
-  "embed",
-  "extract_points"
-)
-
+required <- c("embed", "extract_points")
 available <- vapply(
-  required_functions,
+  required,
   exists,
   logical(1),
   where = asNamespace("manifun"),
@@ -39,10 +32,7 @@ available <- vapply(
 )
 
 if (!all(available)) {
-  stop(
-    "manifun is installed but required functions are missing.",
-    call. = FALSE
-  )
+  stop("manifun is installed but required functions are missing.", call. = FALSE)
 }
 
 cat(

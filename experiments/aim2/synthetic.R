@@ -16,7 +16,7 @@ labels <- c(
   rep(1L, settings$synthetic$n_anomaly)
 )
 
-run_aim2_dataset(
+aim2_run_dataset(
   x,
   labels,
   "Synthetic",

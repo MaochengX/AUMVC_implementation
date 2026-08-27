@@ -193,12 +193,12 @@ aim2_summarize_concordance <- function(run_results) {
       metric = metrics[i],
       matches = matches,
       compared = compared,
-      percentage = 100 * matches / compared
+      percentage = if (compared > 0L) 100 * matches / compared else NA_real_
     )
   }))
 }
 
-run_aim2_dataset <- function(x, labels, dataset, counts, settings) {
+aim2_run_dataset <- function(x, labels, dataset, counts, settings) {
   x <- validate_matrix(x, "x")
   labels <- as.integer(labels)
 

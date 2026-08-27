@@ -28,7 +28,7 @@ data <- rbind(
 )
 features <- c("age", "fnlwgt", "education_num", "capital_gain", "capital_loss", "hours_per_week")
 
-run_aim2_dataset(
+aim2_run_dataset(
   as.matrix(data[, features, drop = FALSE]),
   as.integer(data$income == ">50K"),
   "Adult",

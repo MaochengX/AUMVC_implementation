@@ -67,13 +67,13 @@ em_anomaly <- auemc(
   tau_grid = settings$auemc_tau_grid
 )
 
-print(data.frame(
-  metric = c("AUMVC", "AUEMC"),
-  normality_input = c(mv_normality$aumvc, em_normality$auemc),
-  anomaly_input = c(mv_anomaly$aumvc, em_anomaly$auemc)
-))
-
 stopifnot(
   isTRUE(all.equal(mv_normality$aumvc, mv_anomaly$aumvc, tolerance = 1e-12)),
   isTRUE(all.equal(em_normality$auemc, em_anomaly$auemc, tolerance = 1e-12))
 )
+
+print(data.frame(
+  metric = c("AUMVC", "AUEMC"),
+  value = c(mv_normality$aumvc, em_normality$auemc)
+))
+cat("Score-direction test passed\n")

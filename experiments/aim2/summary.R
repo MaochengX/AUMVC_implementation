@@ -32,7 +32,7 @@ overall <- do.call(rbind, lapply(seq_len(3L), function(i) {
     metric = runs[[1L]]$concordance$metric[i],
     matches = matches,
     compared = compared,
-    percentage = 100 * matches / compared
+    percentage = if (compared > 0L) 100 * matches / compared else NA_real_
   )
 }))
 

@@ -4,7 +4,7 @@ settings <- AIM2_SETTINGS
 data <- read.csv("dataset/pima/pima.csv")
 features <- setdiff(names(data), "label")
 
-run_aim2_dataset(
+aim2_run_dataset(
   as.matrix(data[, features, drop = FALSE]),
   data$label,
   "Pima",
