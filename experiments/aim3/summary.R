@@ -1,50 +1,79 @@
-source("experiments/settings.R")
+results_root <- "experiments/aim3/results"
+latest_file <- file.path(results_root, "latest_experiment.txt")
 
-settings <- AIM3_SETTINGS
-path <- "experiments/aim3/results/synthetic.rds"
+if (!file.exists(latest_file)) {
+  stop(
+    "No completed Aim 3 experiment was found.",
+    call. = FALSE
+  )
+}
+
+experiment_id <- trimws(
+  readLines(latest_file, warn = FALSE)[1L]
+)
+
+experiment_dir <- file.path(
+  results_root,
+  experiment_id
+)
+
+path <- file.path(
+  experiment_dir,
+  "synthetic.rds"
+)
 
 if (!file.exists(path)) {
   stop(
-    "Run experiments/aim3/synthetic_experiment.R first.",
+    "The latest Aim 3 experiment has no synthetic.rds file.",
     call. = FALSE
   )
 }
 
 saved <- readRDS(path)
-
-if (!identical(saved$settings, settings)) {
-  stop("Saved Aim 3 results use different settings.", call. = FALSE)
-}
-
 results <- saved$results
-summary_table <- results[, c(
-  "truth",
-  "intrinsic_dim",
-  "snr",
-  "representation",
-  "aumvc",
-  "aumvc_normalized",
-  "aumvc_normalized_mc_se",
-  "zero_occupancy",
-  "runtime_seconds"
-)]
+runs <- sort(unique(results$run))
 
-names(summary_table) <- c(
-  "truth",
-  "intrinsic_dim",
-  "snr",
-  "representation",
-  "AUMVC",
-  "AUMVC_normalized",
-  "MC_SE_normalized",
-  "zero_occupancy",
-  "runtime_seconds"
-)
+for (run in runs) {
+  run_results <- results[
+    results$run == run,
+    ,
+    drop = FALSE
+  ]
 
-write.csv(
-  summary_table,
-  "experiments/aim3/results/summary.csv",
-  row.names = FALSE
-)
+  output <- run_results[, c(
+    "truth",
+    "intrinsic_dim",
+    "snr",
+    "representation",
+    "aumvc",
+    "aumvc_normalized",
+    "aumvc_normalized_mc_se",
+    "zero_occupancy",
+    "runtime_seconds"
+  )]
 
-print(summary_table, row.names = FALSE, digits = 5)
+  names(output) <- c(
+    "truth",
+    "intrinsic_dim",
+    "snr",
+    "representation",
+    "AUMVC",
+    "AUMVC_normalized",
+    "MC_SE_normalized",
+    "zero_occupancy",
+    "runtime_seconds"
+  )
+
+  output_file <- file.path(
+    experiment_dir,
+    sprintf("run_%02d.csv", run)
+  )
+
+  write.csv(
+    output,
+    output_file,
+    row.names = FALSE
+  )
+
+  cat("Saved: ", output_file, "\n", sep = "")
+}

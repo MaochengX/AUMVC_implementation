@@ -3,10 +3,50 @@ source("experiments/aim3/synthetic.R")
 source("experiments/aim3/representation_comparison.R")
 
 settings <- AIM3_SETTINGS
-results_dir <- "experiments/aim3/results"
-checkpoint_dir <- file.path(results_dir, "checkpoints")
-settings_file <- file.path(checkpoint_dir, "settings.rds")
-final_file <- file.path(results_dir, "synthetic.rds")
+results_root <- "experiments/aim3/results"
+active_file <- file.path(results_root, "active_experiment.txt")
+latest_file <- file.path(results_root, "latest_experiment.txt")
+
+dir.create(results_root, recursive = TRUE, showWarnings = FALSE)
+
+aim3_new_experiment_id <- function() {
+  base_id <- format(Sys.time(), "%Y%m%d_%H%M%S")
+  experiment_id <- base_id
+  suffix <- 1L
+
+  while (dir.exists(file.path(results_root, experiment_id))) {
+    suffix <- suffix + 1L
+    experiment_id <- paste0(base_id, "_", sprintf("%02d", suffix))
+  }
+
+  experiment_id
+}
+
+if (file.exists(active_file)) {
+  experiment_id <- trimws(readLines(active_file, warn = FALSE)[1L])
+  experiment_dir <- file.path(results_root, experiment_id)
+
+  if (!nzchar(experiment_id) || !dir.exists(experiment_dir)) {
+    stop(
+      "The active Aim 3 experiment record is invalid.",
+      call. = FALSE
+    )
+  }
+
+  cat("Resuming Aim 3 experiment: ", experiment_id, "\n", sep = "")
+} else {
+  experiment_id <- aim3_new_experiment_id()
+  experiment_dir <- file.path(results_root, experiment_id)
+
+  dir.create(experiment_dir, recursive = TRUE)
+  writeLines(experiment_id, active_file)
+
+  cat("Starting Aim 3 experiment: ", experiment_id, "\n", sep = "")
+}
+
+checkpoint_dir <- file.path(experiment_dir, "checkpoints")
+settings_file <- file.path(experiment_dir, "settings.rds")
+final_file <- file.path(experiment_dir, "synthetic.rds")
 
 dir.create(checkpoint_dir, recursive = TRUE, showWarnings = FALSE)
 
@@ -14,8 +54,10 @@ if (file.exists(settings_file)) {
   if (!identical(readRDS(settings_file), settings)) {
     stop(
       paste(
-        "Aim 3 settings changed since the checkpoints were created.",
-        "Delete experiments/aim3/results/checkpoints before rerunning."
+        "Aim 3 settings changed during an unfinished experiment.",
+        "Restore the previous settings to resume, or delete",
+        "experiments/aim3/results/active_experiment.txt",
+        "to start a new experiment."
       ),
       call. = FALSE
     )
@@ -49,6 +91,7 @@ aim3_format_time <- function(seconds) {
   hours <- seconds %/% 3600L
   minutes <- (seconds %% 3600L) %/% 60L
   seconds <- seconds %% 60L
+
   sprintf("%02d:%02d:%02d", hours, minutes, seconds)
 }
 
@@ -56,6 +99,7 @@ aim3_show_progress <- function(done, total, elapsed, mean_case_time) {
   width <- 30L
   fraction <- done / total
   filled <- floor(width * fraction)
+
   eta <- if (is.finite(mean_case_time)) {
     (total - done) * mean_case_time
   } else {
@@ -78,6 +122,7 @@ aim3_show_progress <- function(done, total, elapsed, mean_case_time) {
     aim3_format_time(elapsed),
     aim3_format_time(eta)
   ))
+
   flush.console()
 }
 
@@ -102,7 +147,8 @@ case_times <- numeric(0)
 start_time <- proc.time()[[3L]]
 
 cat(sprintf(
-  "Aim 3 synthetic experiment: %d total cases, %d already complete\n",
+  "%d runs, %d total cases, %d already complete\n",
+  settings$n_runs,
   total_cases,
   done_cases
 ))
@@ -113,19 +159,24 @@ for (i in seq_len(total_cases)) {
   if (file.exists(checkpoint_files[i])) next
 
   case_start <- proc.time()[[3L]]
+
   truth_index <- match(
     grid$truth[i],
     settings$synthetic$truth_functions
   )
+
   dimension_index <- match(
     grid$intrinsic_dim[i],
     settings$synthetic$intrinsic_dims
   )
 
-  run_seed <- experiment_run_seed(settings, grid$run[i])
+  run_seed <- settings$seed +
+    (grid$run[i] - 1L) * 100000L
+
   case_seed <- run_seed +
     10000L * truth_index +
     1000L * dimension_index
+
   analysis_seed <- run_seed + 50000L
 
   case <- aim3_generate_synthetic(
@@ -152,11 +203,16 @@ for (i in seq_len(total_cases)) {
 
   temporary_file <- paste0(checkpoint_files[i], ".tmp")
   saveRDS(result, temporary_file)
+
   if (!file.rename(temporary_file, checkpoint_files[i])) {
     stop("Could not save Aim 3 checkpoint.", call. = FALSE)
   }
 
-  case_times <- c(case_times, proc.time()[[3L]] - case_start)
+  case_times <- c(
+    case_times,
+    proc.time()[[3L]] - case_start
+  )
+
   done_cases <- done_cases + 1L
 
   aim3_show_progress(
@@ -168,11 +224,23 @@ for (i in seq_len(total_cases)) {
 }
 
 cat("\n")
-results <- do.call(rbind, lapply(checkpoint_files, readRDS))
+
+results <- do.call(
+  rbind,
+  lapply(checkpoint_files, readRDS)
+)
 
 saveRDS(
-  list(settings = settings, results = results),
+  list(
+    settings = settings,
+    experiment_id = experiment_id,
+    results = results
+  ),
   final_file
 )
 
+writeLines(experiment_id, latest_file)
+unlink(active_file)
+
+cat("Completed Aim 3 experiment: ", experiment_id, "\n", sep = "")
 cat("Saved: ", final_file, "\n", sep = "")
