@@ -48,7 +48,7 @@ AIM2_SETTINGS <- list(
 
 AIM3_SETTINGS <- list(
   seed = 1111L,
-  n_runs = 1L,
+  n_runs = 10L,
   synthetic = list(
     n = 1000L,
     ambient_dim = 200L,
@@ -73,6 +73,24 @@ AIM3_SETTINGS <- list(
   goix_subsampling = list(
     n_subsets = 50L,
     subset_dim = 5L
+  ),
+  real = list(
+    datasets = c("ECG200","fashion_mnist","shuttle"),
+    mds_dim = 5L,
+    ecg200 = list(
+      data_dir = "dataset/ECG200"
+    ),
+    fashion_mnist = list(
+      data_dir = "dataset/fashion",
+      sample_size = 1000L,
+      normal_class = 0L,
+      anomaly_fraction = 0.10
+    ),
+    shuttle = list(
+      data_dir = "dataset/shuttle",
+      sample_size = 1000L,
+      excluded_class = 4L
+    )
   ),
   n_reference = 100000L,
   n_mc_repetitions = 5L,

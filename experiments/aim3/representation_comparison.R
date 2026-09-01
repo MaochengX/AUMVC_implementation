@@ -5,6 +5,52 @@ source("aumvc/aumvc.R")
 source("detectors/ocsvm.R")
 source("experiments/aim3/mds_embedding.R")
 
+aim3_variable_reference_columns <- function(x_reference) {
+  lower <- apply(x_reference, 2L, min)
+  upper <- apply(x_reference, 2L, max)
+
+  is.finite(lower) &
+    is.finite(upper) &
+    upper > lower
+}
+
+aim3_filter_reference_constants <- function(
+    x_train,
+    x_reference,
+    x_eval,
+    representation
+) {
+  keep <- aim3_variable_reference_columns(x_reference)
+
+  if (!any(keep)) {
+    stop(
+      representation,
+      " has no variable reference coordinates.",
+      call. = FALSE
+    )
+  }
+
+  removed <- sum(!keep)
+
+  if (removed > 0L) {
+    message(
+      representation,
+      ": removed ",
+      removed,
+      " constant reference coordinates; using ",
+      sum(keep),
+      "."
+    )
+  }
+
+  list(
+    train = x_train[, keep, drop = FALSE],
+    reference = x_reference[, keep, drop = FALSE],
+    eval = x_eval[, keep, drop = FALSE]
+  )
+}
+
+
 aim3_make_reference <- function(x_reference, seed, settings) {
   make_reference(
     x_reference,
@@ -23,6 +69,17 @@ aim3_evaluate_representation <- function(
     settings
 ) {
   start <- proc.time()[[3L]]
+
+  filtered <- aim3_filter_reference_constants(
+    x_train,
+    x_reference,
+    x_eval,
+    representation
+  )
+
+  x_train <- filtered$train
+  x_reference <- filtered$reference
+  x_eval <- filtered$eval
 
   model <- fit_ocsvm(
     x_train,
@@ -70,24 +127,63 @@ aim3_compare_representations <- function(case, seed, settings) {
     require_full = TRUE
   )
 
+  x <- as.matrix(case$x)
+
+  keep <- aim3_variable_reference_columns(
+    x[split$reference, , drop = FALSE]
+  )
+
+  if (!any(keep)) {
+    stop(
+      "The reference split has no variable coordinates.",
+      call. = FALSE
+    )
+  }
+
+  removed <- sum(!keep)
+
+  if (removed > 0L) {
+    message(
+      "Input: removed ",
+      removed,
+      " constant reference coordinates; using ",
+      sum(keep),
+      "."
+    )
+  }
+
+  x <- x[, keep, drop = FALSE]
+
+  minimum_dim <- max(
+    as.integer(settings$goix_subsampling$subset_dim),
+    as.integer(case$intrinsic_dim)
+  )
+
+  if (ncol(x) < minimum_dim) {
+    stop(
+      "Too few variable coordinates remain for Aim 3.",
+      call. = FALSE
+    )
+  }
+
   standardizer <- fit_standardizer(
-    case$x[split$embedding, , drop = FALSE]
+    x[split$embedding, , drop = FALSE]
   )
 
   x_embedding <- apply_standardizer(
-    case$x[split$embedding, , drop = FALSE],
+    x[split$embedding, , drop = FALSE],
     standardizer
   )
   x_train <- apply_standardizer(
-    case$x[split$detector_train, , drop = FALSE],
+    x[split$detector_train, , drop = FALSE],
     standardizer
   )
   x_reference <- apply_standardizer(
-    case$x[split$reference, , drop = FALSE],
+    x[split$reference, , drop = FALSE],
     standardizer
   )
   x_eval <- apply_standardizer(
-    case$x[split$evaluation, , drop = FALSE],
+    x[split$evaluation, , drop = FALSE],
     standardizer
   )
 
