@@ -1,4 +1,4 @@
-source("experiments/settings.R")
+source("experiments/aim1/settings.R")
 source("aumvc/input_validation.R")
 source("aumvc/level_set.R")
 source("aumvc/aumvc.R")
@@ -40,7 +40,8 @@ mv <- aumvc(
   alpha_grid = settings$aumvc_alpha_grid
 )
 
-print(data.frame(
+result <- data.frame(
   AUMVC = mv$aumvc,
   MC_SE = mv$aumvc_mc_se
-))
+)
+print(result)

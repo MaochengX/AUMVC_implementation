@@ -1,4 +1,4 @@
-source("experiments/settings.R")
+source("experiments/aim1/settings.R")
 source("aumvc/input_validation.R")
 source("aumvc/level_set.R")
 source("aumvc/aumvc.R")
@@ -55,8 +55,9 @@ stopifnot(
   isTRUE(all.equal(mv_normality$aumvc, mv_anomaly$aumvc, tolerance = 1e-12))
 )
 
-print(data.frame(
+result <- data.frame(
   AUMVC = mv_normality$aumvc,
   MC_SE = mv_normality$aumvc_mc_se
-))
+)
+print(result)
 cat("Score-direction test passed\n")
