@@ -1,6 +1,6 @@
 AIM3_SETTINGS <- list(
   seed = 1234L,
-  n_runs = 2L,
+  n_runs = 10L,
   synthetic = list(
     n = 1000L,
     ambient_dims = c(80L, 200L, 400L),

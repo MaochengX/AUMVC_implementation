@@ -20,11 +20,10 @@ done <- 0L
 start <- proc.time()[[3L]]
 
 for (run in seq_len(settings$n_runs)) {
-  dataset_dir <- file.path(run_dirs[run], "synthetic")
-  dir.create(dataset_dir, recursive = TRUE, showWarnings = FALSE)
-  checkpoint_dir <- file.path(dataset_dir, "checkpoints")
-  dir.create(checkpoint_dir, showWarnings = FALSE)
-  if (aim3_results_complete(dataset_dir)) {
+  run_dir <- run_dirs[run]
+  checkpoint_dir <- file.path(aim3_run_state_dir(run_dir), "synthetic")
+  dir.create(checkpoint_dir, recursive = TRUE, showWarnings = FALSE)
+  if (aim3_synthetic_complete(run_dir, 3L * nrow(grid))) {
     done <- done + nrow(grid)
     next
   }
@@ -46,8 +45,11 @@ for (run in seq_len(settings$n_runs)) {
       comparison <- aim3_compare_representations(
         case, case_seed + 50000L, settings
       )
-      cases[[i]] <- data.frame(row, run = run,
-                               aim3_add_ambient_deltas(comparison))
+      cases[[i]] <- data.frame(
+        row, run = run, sample_size = nrow(case$x),
+        embedding_dim = row$intrinsic_dim,
+        aim3_add_ambient_deltas(comparison)
+      )
       temporary <- paste0(checkpoint, ".tmp")
       saveRDS(cases[[i]], temporary)
       if (!file.rename(temporary, checkpoint)) stop("Could not save checkpoint.")
@@ -59,9 +61,9 @@ for (run in seq_len(settings$n_runs)) {
                 done, total, elapsed, eta))
     flush.console()
   }
-  aim3_save_results(dataset_dir, do.call(rbind, cases))
+  aim3_save_synthetic(run_dir, do.call(rbind, cases))
 }
 cat("\n")
 aim3_finish_run_batch(run_dirs, "synthetic")
 cat("Saved: ", run_dirs[1L], " through ", tail(run_dirs, 1L),
-    "/synthetic/{all_results,key_results}.csv\n", sep = "")
+    " (synthetic.csv in each run)\n", sep = "")

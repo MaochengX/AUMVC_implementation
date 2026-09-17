@@ -31,9 +31,10 @@ for (dataset in real_settings$datasets) {
   current_md5 <- aim3_real_data_md5(data$files)
   start <- proc.time()[[3L]]
   for (run in seq_len(settings$n_runs)) {
-    dataset_dir <- file.path(run_dirs[run], output_name)
-    dir.create(dataset_dir, recursive = TRUE, showWarnings = FALSE)
-    md5_path <- file.path(dataset_dir, "data_md5.rds")
+    run_dir <- run_dirs[run]
+    state_dir <- file.path(aim3_run_state_dir(run_dir), "real")
+    dir.create(state_dir, recursive = TRUE, showWarnings = FALSE)
+    md5_path <- file.path(state_dir, paste0(output_name, "_md5.rds"))
     if (file.exists(md5_path)) {
       if (!identical(readRDS(md5_path), current_md5)) {
         stop("Dataset files changed while resuming ", dataset)
@@ -41,7 +42,7 @@ for (dataset in real_settings$datasets) {
     } else {
       saveRDS(current_md5, md5_path)
     }
-    if (aim3_results_complete(dataset_dir)) next
+    if (aim3_dataset_complete(run_dir, output_name, 3L)) next
     seed <- settings$seed + run * 100000L
     sampled <- samplers[[dataset]](data, seed, dataset_settings)
     analysis <- settings
@@ -53,7 +54,7 @@ for (dataset in real_settings$datasets) {
       run = run, sample_size = nrow(sampled$x), ambient_dim = ncol(sampled$x),
       embedding_dim = case$intrinsic_dim, aim3_add_ambient_deltas(comparison)
     )
-    aim3_save_results(dataset_dir, result)
+    aim3_save_dataset(run_dir, output_name, result)
     elapsed <- proc.time()[[3L]] - start
     cat(sprintf("\r%s %d/%d | elapsed %.0fs | ETA %.0fs",
                 dataset, run, settings$n_runs, elapsed,
@@ -61,7 +62,9 @@ for (dataset in real_settings$datasets) {
     flush.console()
   }
   cat("\n")
-  cat("Saved ", dataset, " under ", run_dirs[1L], " through ",
-      tail(run_dirs, 1L), "\n", sep = "")
+  cat("Completed ", dataset, "\n", sep = "")
 }
 aim3_finish_run_batch(run_dirs, "real")
+cat("Saved: ", run_dirs[1L], " through ", tail(run_dirs, 1L),
+    " (all_results.csv and key_results.csv for real data in each run)\n",
+    sep = "")
