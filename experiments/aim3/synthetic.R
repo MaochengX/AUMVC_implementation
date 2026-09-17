@@ -136,14 +136,20 @@ aim3_show_generated_function <- function(generated, output_dim = 1L, digits = 4L
   invisible(NULL)
 }
 
-aim3_generate_synthetic <- function(intrinsic_dim, snr, truth, seed, settings) {
+aim3_generate_synthetic <- function(
+    intrinsic_dim, snr, truth, seed, settings,
+    ambient_dim = settings$ambient_dims[1L]
+) {
   q <- as.integer(intrinsic_dim)
-  d <- as.integer(settings$ambient_dim)
+  d <- as.integer(ambient_dim)
   n_distributional <- as.integer(settings$n_distributional)
   n_structural <- as.integer(settings$n_structural)
   n_normal <- as.integer(settings$n) - n_distributional - n_structural
 
   if (n_normal < 1L) stop("Invalid Aim 3 synthetic sample sizes.", call. = FALSE)
+  if (!d %in% settings$ambient_dims || d <= 5L * q) {
+    stop("Invalid synthetic ambient dimension (must exceed the basis dimension).", call. = FALSE)
+  }
   if (!q %in% settings$intrinsic_dims) stop("Unsupported intrinsic dimension.", call. = FALSE)
   if (!snr %in% settings$snr_levels) stop("Unsupported SNR level.", call. = FALSE)
   if (!truth %in% settings$truth_functions) stop("Unsupported truth function.", call. = FALSE)
@@ -203,6 +209,7 @@ aim3_generate_synthetic <- function(intrinsic_dim, snr, truth, seed, settings) {
 
   list(
     x = rbind(signal_normal, signal_distributional, signal_structural) + noise,
+    labels = as.integer(outlier_type != "normal"),
     outlier_type = outlier_type,
     truth = truth,
     intrinsic_dim = q,
