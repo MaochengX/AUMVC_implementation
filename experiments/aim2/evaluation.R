@@ -1,4 +1,4 @@
-source("experiments/settings.R")
+source("experiments/aim2/settings.R")
 source("experiments/utils.R")
 source("aumvc/input_validation.R")
 source("aumvc/level_set.R")
@@ -227,13 +227,8 @@ aim2_run_dataset <- function(x, labels, dataset, counts, settings) {
   }
 
   run_results <- lapply(seq_len(settings$n_runs), function(run) {
-    aim2_run_once(
-      x,
-      labels,
-      counts,
-      experiment_run_seed(settings, run),
-      settings
-    )
+    aim2_run_once(x, labels, counts,
+                  experiment_run_seed(settings, run), settings)
   })
 
   detector_runs <- aim2_summarize_detectors(run_results)
@@ -249,9 +244,6 @@ aim2_run_dataset <- function(x, labels, dataset, counts, settings) {
     concordance = concordance
   )
 
-  dir.create("experiments/aim2/results", recursive = TRUE, showWarnings = FALSE)
-  saveRDS(output, file.path("experiments/aim2/results", paste0(tolower(dataset), ".rds")))
-
   display <- data.frame(
     detector = output$detector_summary$detector,
     AUMVC = format_mean_sd(output$detector_summary$aumvc_mean, output$detector_summary$aumvc_sd),
@@ -264,4 +256,51 @@ aim2_run_dataset <- function(x, labels, dataset, counts, settings) {
   cat("\nComparisons across all runs\n")
   print(concordance, row.names = FALSE)
   invisible(output)
+}
+
+aim2_format_result <- function(mean, sd) {
+  if (is.na(sd)) return(formatC(mean, digits = 4L, format = "f"))
+  format_mean_sd(mean, sd)
+}
+
+aim2_comparison_rows <- function(dataset, comparison) {
+  data.frame(
+    dataset = rep(dataset, nrow(comparison)),
+    detector = "",
+    AUMVC = "",
+    ROC_AUC = "",
+    PR_AUC = "",
+    metric = comparison$metric,
+    matches = comparison$matches,
+    compared = comparison$compared,
+    percentage = comparison$percentage
+  )
+}
+
+aim2_report_rows <- function(output) {
+  summary <- output$detector_summary
+  dataset <- paste0(output$dataset, " - ", output$n_runs, " runs")
+  detector_rows <- data.frame(
+    dataset = rep(dataset, nrow(summary)),
+    detector = summary$detector,
+    AUMVC = mapply(aim2_format_result, summary$aumvc_mean, summary$aumvc_sd),
+    ROC_AUC = mapply(aim2_format_result, summary$roc_mean, summary$roc_sd),
+    PR_AUC = mapply(aim2_format_result, summary$pr_mean, summary$pr_sd),
+    metric = "",
+    matches = NA_integer_,
+    compared = NA_integer_,
+    percentage = NA_real_
+  )
+  rbind(detector_rows, aim2_comparison_rows(dataset, output$concordance))
+}
+
+aim2_save_report <- function(rows, name) {
+  directory <- "experiments/aim2/result"
+  dir.create(directory, recursive = TRUE, showWarnings = FALSE)
+  path <- file.path(directory, paste0(name, ".csv"))
+  temporary <- paste0(path, ".tmp")
+  on.exit(if (file.exists(temporary)) unlink(temporary), add = TRUE)
+  utils::write.csv(rows, temporary, row.names = FALSE, na = "")
+  if (!file.rename(temporary, path)) stop("Could not save Aim 2 CSV.")
+  cat("Saved: ", path, "\n", sep = "")
 }

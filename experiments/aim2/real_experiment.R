@@ -15,4 +15,11 @@ outputs <- lapply(settings$real_datasets, function(dataset) {
 
 cat("\nTOTAL across ", length(outputs), " datasets and ", settings$n_runs,
     " runs per dataset\n", sep = "")
-print(aim2_total_concordance(outputs), row.names = FALSE)
+total <- aim2_total_concordance(outputs)
+print(total, row.names = FALSE)
+
+rows <- do.call(rbind, lapply(outputs, aim2_report_rows))
+total_label <- paste0("TOTAL across ", length(outputs), " datasets and ",
+                      settings$n_runs, " runs per dataset")
+total_rows <- aim2_comparison_rows(total_label, total)
+aim2_save_report(rbind(rows, total_rows), "real")

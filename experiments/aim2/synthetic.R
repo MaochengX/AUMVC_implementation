@@ -16,10 +16,11 @@ labels <- c(
   rep(1L, settings$synthetic$n_anomaly)
 )
 
-aim2_run_dataset(
+output <- aim2_run_dataset(
   x,
   labels,
   "Synthetic",
   settings$split_counts$synthetic,
   settings
 )
+aim2_save_report(aim2_report_rows(output), "synthetic")
