@@ -18,6 +18,9 @@ aim3_evaluate_goix_subsampling <- function(
     x_train,
     x_reference,
     x_eval,
+    x_label,
+    labels_label,
+    types_label,
     seed,
     settings
 ) {
@@ -35,6 +38,7 @@ aim3_evaluate_goix_subsampling <- function(
     train_subset <- x_train[, columns, drop = FALSE]
     reference_subset <- x_reference[, columns, drop = FALSE]
     eval_subset <- x_eval[, columns, drop = FALSE]
+    label_subset <- x_label[, columns, drop = FALSE]
 
     model <- fit_ocsvm(
       train_subset,
@@ -55,13 +59,23 @@ aim3_evaluate_goix_subsampling <- function(
       score_direction = "anomaly",
       alpha_grid = settings$aumvc_alpha_grid
     )
+    label_scores <- score_ocsvm(model, label_subset)
+    type_metrics <- aim3_type_metrics(labels_label, label_scores, types_label)
 
     results[[i]] <- data.frame(
       aumvc = mv$aumvc,
       aumvc_normalized = mv$aumvc_normalized,
       aumvc_mc_se = mv$aumvc_mc_se,
       aumvc_normalized_mc_se = mv$aumvc_normalized_mc_se,
-      zero_occupancy = mean(mv$mv_curve$volume_normalized == 0)
+      zero_occupancy = mean(mv$mv_curve$volume_normalized == 0),
+      low_occupancy = mean(mv$mv_curve$volume_normalized < 10 / settings$n_reference),
+      box_log_volume = reference$box$log_volume,
+      roc_auc = roc_auc_score(labels_label, label_scores),
+      pr_auc = pr_auc_score(labels_label, label_scores),
+      roc_distributional = unname(type_metrics["roc_distributional"]),
+      pr_distributional = unname(type_metrics["pr_distributional"]),
+      roc_structural = unname(type_metrics["roc_structural"]),
+      pr_structural = unname(type_metrics["pr_structural"])
     )
   }
 
@@ -82,6 +96,14 @@ aim3_evaluate_goix_subsampling <- function(
       sum(results$aumvc_normalized_mc_se^2)
     ) / nrow(results),
     zero_occupancy = mean(results$zero_occupancy),
+    low_occupancy = mean(results$low_occupancy),
+    box_log_volume = mean(results$box_log_volume),
+    roc_auc = mean(results$roc_auc),
+    pr_auc = mean(results$pr_auc),
+    roc_distributional = mean(results$roc_distributional),
+    pr_distributional = mean(results$pr_distributional),
+    roc_structural = mean(results$roc_structural),
+    pr_structural = mean(results$pr_structural),
     runtime_seconds = proc.time()[[3L]] - start
   )
 }
