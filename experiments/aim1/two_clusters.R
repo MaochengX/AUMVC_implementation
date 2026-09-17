@@ -2,7 +2,6 @@ source("experiments/settings.R")
 source("aumvc/input_validation.R")
 source("aumvc/level_set.R")
 source("aumvc/aumvc.R")
-source("aumvc/auemc.R")
 
 settings <- AIM1_SETTINGS
 set.seed(experiment_seed(settings, 2L))
@@ -52,28 +51,12 @@ mv_anomaly <- aumvc(
   score_direction = "anomaly",
   alpha_grid = settings$aumvc_alpha_grid
 )
-em_normality <- auemc(
-  x_eval,
-  reference,
-  normality_score,
-  score_direction = "normality",
-  tau_grid = settings$auemc_tau_grid
-)
-em_anomaly <- auemc(
-  x_eval,
-  reference,
-  anomaly_score,
-  score_direction = "anomaly",
-  tau_grid = settings$auemc_tau_grid
-)
-
 stopifnot(
-  isTRUE(all.equal(mv_normality$aumvc, mv_anomaly$aumvc, tolerance = 1e-12)),
-  isTRUE(all.equal(em_normality$auemc, em_anomaly$auemc, tolerance = 1e-12))
+  isTRUE(all.equal(mv_normality$aumvc, mv_anomaly$aumvc, tolerance = 1e-12))
 )
 
 print(data.frame(
-  metric = c("AUMVC", "AUEMC"),
-  value = c(mv_normality$aumvc, em_normality$auemc)
+  AUMVC = mv_normality$aumvc,
+  MC_SE = mv_normality$aumvc_mc_se
 ))
 cat("Score-direction test passed\n")

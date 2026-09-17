@@ -88,9 +88,9 @@ aim2_run_once <- function(x, labels, counts, seed, settings) {
     seed
   )
 
-  x_train <- x[split$detector_train[labels[split$detector_train] == 0L], , drop = FALSE]
-  x_reference <- x[split$reference[labels[split$reference] == 0L], , drop = FALSE]
-  x_aumvc <- x[split$aumvc[labels[split$aumvc] == 0L], , drop = FALSE]
+  x_train <- x[split$detector_train, , drop = FALSE]
+  x_reference <- x[split$reference, , drop = FALSE]
+  x_aumvc <- x[split$aumvc, , drop = FALSE]
   x_label <- x[split$label_eval, , drop = FALSE]
   labels_label <- labels[split$label_eval]
 
@@ -102,6 +102,15 @@ aim2_run_once <- function(x, labels, counts, seed, settings) {
   ) {
     stop("The Aim 2 split is not usable.", call. = FALSE)
   }
+
+  lower <- apply(x_reference, 2L, min)
+  upper <- apply(x_reference, 2L, max)
+  keep <- upper > lower
+  if (!any(keep)) stop("No variable reference features in Aim 2.")
+  x_train <- x_train[, keep, drop = FALSE]
+  x_reference <- x_reference[, keep, drop = FALSE]
+  x_aumvc <- x_aumvc[, keep, drop = FALSE]
+  x_label <- x_label[, keep, drop = FALSE]
 
   standardizer <- fit_standardizer(x_train)
   x_train <- apply_standardizer(x_train, standardizer)
@@ -127,11 +136,11 @@ aim2_run_once <- function(x, labels, counts, seed, settings) {
       score_direction = "anomaly",
       alpha_grid = settings$aumvc_alpha_grid
     )
-
     data.frame(
       detector = detector,
       aumvc = mv$aumvc,
       aumvc_normalized = mv$aumvc_normalized,
+      aumvc_mc_se = mv$aumvc_mc_se,
       roc_auc = roc_auc_score(labels_label, label_scores),
       pr_auc = pr_auc_score(labels_label, label_scores)
     )
@@ -149,7 +158,6 @@ aim2_run_once <- function(x, labels, counts, seed, settings) {
     results$pr_auc,
     settings$concordance_tolerance
   )
-
   list(
     results = results,
     roc_pairs = roc_pairs,
@@ -198,6 +206,18 @@ aim2_summarize_concordance <- function(run_results) {
   }))
 }
 
+aim2_total_concordance <- function(outputs) {
+  metrics <- outputs[[1L]]$concordance$metric
+  do.call(rbind, lapply(seq_along(metrics), function(i) {
+    matches <- sum(vapply(outputs, function(x) x$concordance$matches[i], numeric(1)))
+    compared <- sum(vapply(outputs, function(x) x$concordance$compared[i], numeric(1)))
+    data.frame(
+      metric = metrics[i], matches = matches, compared = compared,
+      percentage = if (compared > 0L) 100 * matches / compared else NA_real_
+    )
+  }))
+}
+
 aim2_run_dataset <- function(x, labels, dataset, counts, settings) {
   x <- validate_matrix(x, "x")
   labels <- as.integer(labels)
@@ -219,6 +239,7 @@ aim2_run_dataset <- function(x, labels, dataset, counts, settings) {
   detector_runs <- aim2_summarize_detectors(run_results)
   concordance <- aim2_summarize_concordance(run_results)
   output <- list(
+    protocol = "unsupervised_disjoint_mv",
     dataset = dataset,
     n_runs = settings$n_runs,
     base_seed = settings$seed,
@@ -240,7 +261,7 @@ aim2_run_dataset <- function(x, labels, dataset, counts, settings) {
 
   cat(dataset, " - ", settings$n_runs, " runs\n\n", sep = "")
   print(display, row.names = FALSE)
-  cat("\n")
+  cat("\nComparisons across all runs\n")
   print(concordance, row.names = FALSE)
   invisible(output)
 }

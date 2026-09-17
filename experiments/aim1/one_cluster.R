@@ -2,7 +2,6 @@ source("experiments/settings.R")
 source("aumvc/input_validation.R")
 source("aumvc/level_set.R")
 source("aumvc/aumvc.R")
-source("aumvc/auemc.R")
 
 settings <- AIM1_SETTINGS
 set.seed(experiment_seed(settings, 1L))
@@ -41,16 +40,7 @@ mv <- aumvc(
   alpha_grid = settings$aumvc_alpha_grid
 )
 
-em <- auemc(
-  x_eval,
-  reference,
-  score_fun,
-  score_direction = "normality",
-  tau_grid = settings$auemc_tau_grid
-)
-
 print(data.frame(
-  metric = c("AUMVC", "AUEMC"),
-  value = c(mv$aumvc, em$auemc),
-  mc_se = c(mv$aumvc_mc_se, em$auemc_mc_se)
+  AUMVC = mv$aumvc,
+  MC_SE = mv$aumvc_mc_se
 ))

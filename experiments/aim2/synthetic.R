@@ -1,4 +1,4 @@
-source("experiments/aim2/validation_agianst_labels.R")
+source("experiments/aim2/evaluation.R")
 settings <- AIM2_SETTINGS
 set.seed(settings$seed)
 

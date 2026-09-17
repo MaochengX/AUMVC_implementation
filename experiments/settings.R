@@ -1,9 +1,8 @@
 AIM1_SETTINGS <- list(
-  seed = 1111L,
+  seed = 1234L,
   n_reference = 20000L,
   n_mc_repetitions = 5L,
   aumvc_alpha_grid = seq(0.9, 0.999, by = 0.0001),
-  auemc_tau_grid = c(0, 10^seq(-6, 6, length.out = 800)),
   one_cluster = list(
     n_train = 200L,
     n_eval = 200L,
@@ -19,11 +18,12 @@ AIM1_SETTINGS <- list(
 )
 
 AIM2_SETTINGS <- list(
-  seed = 1111L,
+  seed = 1234L,
   n_runs = 2L,
   n_reference = 20000L,
   n_mc_repetitions = 5L,
   aumvc_alpha_grid = seq(0.9, 0.999, by = 0.0001),
+  real_datasets = c("adult", "http", "pima", "smtp", "wilt"),
   concordance_tolerance = 1e-8,
   detectors = list(
     ocsvm = list(nu = 0.5),
@@ -47,11 +47,11 @@ AIM2_SETTINGS <- list(
 )
 
 AIM3_SETTINGS <- list(
-  seed = 1111L,
-  n_runs = 10L,
+  seed = 1234L,
+  n_runs = 1L,
   synthetic = list(
     n = 1000L,
-    ambient_dim = 200L,
+    ambient_dims = c(80L, 200L, 400L),
     intrinsic_dims = c(3L, 5L, 10L),
     snr_levels = c(1, 5, 10),
     truth_functions = c(
@@ -64,19 +64,21 @@ AIM3_SETTINGS <- list(
     structural_shift = 3
   ),
   split_counts = c(
-    embedding = 250L,
-    detector_train = 250L,
-    reference = 250L,
-    evaluation = 250L
+    embedding = 200L,
+    detector_train = 200L,
+    reference = 200L,
+    evaluation = 200L,
+    label_eval = 200L
   ),
   detector = list(nu = 0.5),
+  embedding = list(method = "mds"),
   goix_subsampling = list(
     n_subsets = 50L,
     subset_dim = 5L
   ),
   real = list(
-    datasets = c("ECG200","fashion_mnist","shuttle"),
-    mds_dim = 5L,
+    datasets = c("ecg200", "fashion_mnist", "shuttle"),
+    embedding_dim = 5L,
     ecg200 = list(
       data_dir = "dataset/ECG200"
     ),
@@ -97,7 +99,17 @@ AIM3_SETTINGS <- list(
   aumvc_alpha_grid = seq(0.9, 0.999, by = 0.0001)
 )
 
-AIM4_SETTINGS <- list(seed = 1111L)
+AIM4_SETTINGS <- list(
+  seed = 1234L,
+  n_runs = 5L,
+  mds_dim = 3L,
+  nu = 0.5,
+  gamma_multipliers = c(0.25, 0.5, 1, 2, 4),
+  n_reference = 20000L,
+  n_mc_repetitions = 3L,
+  alpha_grid = seq(0.9, 0.999, by = 0.0001),
+  dataset_dir = "dataset/ECG200"
+)
 
 experiment_seed <- function(settings, offset = 0L) {
   settings$seed + as.integer(offset)
