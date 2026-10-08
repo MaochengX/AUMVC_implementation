@@ -23,44 +23,55 @@ euclidean_distances <- function(x, y) {
 
 k_neighbors <- function(distances, k) {
   kth <- sort(distances, partial = k)[k]
-  below <- which(distances < kth)
-  tied <- which(distances == kth)
-
-  c(below, tied[seq_len(k - length(below))])
+  which(distances <= kth)
 }
 
-fit_lof <- function(x_train, k = 20L) {
+fit_lof <- function(x_train, k = 20L, chunk_size = 250L) {
   x_train <- lof_matrix(x_train)
 
   k <- as.integer(k)
+  chunk_size <- as.integer(chunk_size)
   n <- nrow(x_train)
 
-  if (k < 1L || k >= n) {
+  if (
+    length(k) != 1L || is.na(k) || k < 1L || k >= n ||
+    length(chunk_size) != 1L || is.na(chunk_size) || chunk_size < 1L
+  ) {
     stop("k must be between 1 and nrow(x_train) - 1", call. = FALSE)
   }
 
-  distances <- euclidean_distances(x_train, x_train)
-  diag(distances) <- Inf
-
-  neighbors <- lapply(
-    seq_len(n),
-    function(i) k_neighbors(distances[i, ], k)
-  )
-
-  k_distance <- vapply(
-    seq_len(n),
-    function(i) max(distances[i, neighbors[[i]]]),
-    numeric(1)
-  )
+  neighbors <- vector("list", n)
+  k_distance <- numeric(n)
+  for (start in seq(1L, n, by = chunk_size)) {
+    end <- min(start + chunk_size - 1L, n)
+    rows <- start:end
+    distances <- euclidean_distances(
+      x_train[rows, , drop = FALSE],
+      x_train
+    )
+    distances[cbind(seq_along(rows), rows)] <- Inf
+    for (position in seq_along(rows)) {
+      index <- k_neighbors(distances[position, ], k)
+      neighbors[[rows[position]]] <- index
+      k_distance[rows[position]] <- max(distances[position, index])
+    }
+  }
 
   lrd <- vapply(
     seq_len(n),
     function(i) {
       index <- neighbors[[i]]
+      difference <- sweep(
+        x_train[index, , drop = FALSE],
+        2L,
+        x_train[i, ],
+        "-"
+      )
+      distance <- sqrt(rowSums(difference^2))
 
       reachability <- pmax(
         k_distance[index],
-        distances[i, index]
+        distance
       )
 
       1 / (mean(reachability) + 1e-10)
@@ -79,9 +90,13 @@ fit_lof <- function(x_train, k = 20L) {
 
 score_lof <- function(model, newdata, chunk_size = 500L) {
   newdata <- lof_matrix(newdata)
+  chunk_size <- as.integer(chunk_size)
 
   if (ncol(newdata) != model$dimension) {
     stop("newdata has the wrong dimension", call. = FALSE)
+  }
+  if (length(chunk_size) != 1L || is.na(chunk_size) || chunk_size < 1L) {
+    stop("chunk_size must be a positive integer", call. = FALSE)
   }
 
   scores <- numeric(nrow(newdata))

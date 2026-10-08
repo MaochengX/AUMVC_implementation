@@ -20,7 +20,9 @@ output <- aim2_run_dataset(
   x,
   labels,
   "Synthetic",
-  settings$split_counts$synthetic,
   settings
 )
-aim2_save_report(aim2_report_rows(output), "synthetic")
+directory <- aim2_next_experiment("experiments/aim2/result/synthetic")
+path <- file.path(directory, "synthetic_results.csv")
+aim2_save_csv(aim2_report_rows(output), path)
+cat("Saved: ", path, "\n", sep = "")

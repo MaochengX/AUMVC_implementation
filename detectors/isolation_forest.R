@@ -99,11 +99,18 @@ fit_isolation_forest <- function(
     seed = 2030L
 ) {
   x_train <- iforest_matrix(x_train)
+  ntrees <- as.integer(ntrees)
+  sample_size <- as.integer(sample_size)
 
-  sample_size <- min(
-    as.integer(sample_size),
-    nrow(x_train)
-  )
+  if (length(ntrees) != 1L || is.na(ntrees) || ntrees < 1L) {
+    stop("ntrees must be a positive integer", call. = FALSE)
+  }
+  if (length(sample_size) != 1L || is.na(sample_size) || sample_size < 2L) {
+    stop("sample_size must be at least 2", call. = FALSE)
+  }
+
+  sample_size <- min(sample_size, nrow(x_train))
+  if (sample_size < 2L) stop("At least two training rows are required", call. = FALSE)
 
   height_limit <- ceiling(log2(sample_size))
   set.seed(seed)
@@ -127,7 +134,7 @@ fit_isolation_forest <- function(
 
   list(
     trees = trees,
-    ntrees = as.integer(ntrees),
+    ntrees = ntrees,
     sample_size = sample_size,
     dimension = ncol(x_train)
   )
@@ -147,9 +154,9 @@ score_isolation_forest <- function(model, newdata) {
   }
 
   mean_path <- path_sum / model$ntrees
-
-  2^(
-    -mean_path /
-      iforest_c(model$sample_size)
-  )
+  normalizer <- iforest_c(model$sample_size)
+  if (!is.finite(normalizer) || normalizer <= 0) {
+    stop("Invalid Isolation Forest path-length normalizer", call. = FALSE)
+  }
+  2^(-mean_path / normalizer)
 }

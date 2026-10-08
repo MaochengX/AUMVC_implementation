@@ -7,27 +7,90 @@ aumvc_from_scores <- function(
     box_log_volume = NULL
 ) {
   alpha_grid <- validate_alpha_grid(alpha_grid)
-  evaluation_scores <- orient_scores(validate_scores(evaluation_scores), score_direction)
-  reference_scores <- orient_scores(validate_scores(reference_scores), score_direction)
+  evaluation_scores <- orient_scores(
+    validate_scores(evaluation_scores),
+    score_direction
+  )
+  reference_scores <- orient_scores(
+    validate_scores(reference_scores),
+    score_direction
+  )
 
   n <- length(evaluation_scores)
   ordered_scores <- sort(evaluation_scores, decreasing = TRUE)
   threshold <- ordered_scores[pmin(n, ceiling(alpha_grid * n))]
-  occupancy <- vapply(threshold, function(u) mean(reference_scores >= u), numeric(1))
-  volume <- scale_occupancy_volume(occupancy, box_volume, box_log_volume)
+
+  count_below <- function(sorted_values, value) {
+    left <- 1L
+    right <- length(sorted_values) + 1L
+    while (left < right) {
+      middle <- floor((left + right) / 2)
+      if (middle <= length(sorted_values) && sorted_values[middle] < value) {
+        left <- middle + 1L
+      } else {
+        right <- middle
+      }
+    }
+    as.integer(left - 1L)
+  }
+  sorted_reference <- sort(reference_scores)
+
+  hit_count <- length(sorted_reference) - vapply(
+    threshold,
+    function(value) count_below(sorted_reference, value),
+    integer(1)
+  )
+  occupancy <- hit_count / length(reference_scores)
+
+  volume <- scale_occupancy_volume(
+    occupancy,
+    box_volume,
+    box_log_volume
+  )
+
+  if (is.null(box_log_volume)) box_log_volume <- log(box_volume)
+  log_volume <- rep(-Inf, length(occupancy))
+  positive <- occupancy > 0
+  log_volume[positive] <- box_log_volume + log(occupancy[positive])
+
+  aumvc_log <- log_trapezoid_area(alpha_grid, log_volume)
+
+  widths <- diff(alpha_grid)
+  weights <- c(
+    widths[1L] / 2,
+    (head(widths, -1L) + tail(widths, -1L)) / 2,
+    tail(widths, 1L) / 2
+  )
+
+  threshold_order <- order(threshold)
+  ordered_threshold <- threshold[threshold_order]
+  cumulative_weight <- cumsum(weights[threshold_order])
+  contribution_index <- findInterval(reference_scores, ordered_threshold)
+  mc_contribution <- numeric(length(reference_scores))
+  positive_index <- contribution_index > 0L
+  mc_contribution[positive_index] <- cumulative_weight[
+    contribution_index[positive_index]
+  ]
 
   curve <- data.frame(
     alpha = alpha_grid,
     threshold = threshold,
-    empirical_mass = vapply(threshold, function(u) mean(evaluation_scores >= u), numeric(1)),
+    empirical_mass = vapply(
+      threshold,
+      function(value) mean(evaluation_scores >= value),
+      numeric(1)
+    ),
+    hit_count = hit_count,
     volume = volume,
     volume_normalized = occupancy
   )
 
   list(
     mv_curve = curve,
-    aumvc = trapezoid_area(curve$alpha, curve$volume),
-    aumvc_normalized = trapezoid_area(curve$alpha, curve$volume_normalized)
+    aumvc = exp_if_representable(aumvc_log),
+    aumvc_log = aumvc_log,
+    aumvc_normalized = mean(mc_contribution),
+    mc_contribution = mc_contribution
   )
 }
 
@@ -41,53 +104,65 @@ aumvc <- function(
   x_eval <- validate_matrix(x_eval, "x_eval")
   if (!is.function(score_fun)) stop("score_fun must be a function", call. = FALSE)
 
-  evaluation_scores <- validate_scores(score_fun(x_eval), nrow(x_eval), "evaluation_scores")
-  reference_scores <- score_reference_repetitions(reference, score_fun)
-  repetitions <- lapply(reference_scores, function(scores) {
-    aumvc_from_scores(
-      evaluation_scores,
-      scores,
-      reference$box$volume,
-      score_direction,
-      alpha_grid,
-      reference$box$log_volume
-    )
-  })
-
-  values <- vapply(repetitions, function(x) x$aumvc, numeric(1))
-  normalized <- vapply(repetitions, function(x) x$aumvc_normalized, numeric(1))
-  volume_matrix <- do.call(cbind, lapply(repetitions, function(x) x$mv_curve$volume))
-  normalized_matrix <- do.call(
-    cbind,
-    lapply(repetitions, function(x) x$mv_curve$volume_normalized)
+  evaluation_scores <- validate_scores(
+    score_fun(x_eval),
+    nrow(x_eval),
+    "evaluation_scores"
   )
+  reference_scores <- score_reference_repetitions(reference, score_fun)
+  combined_scores <- unlist(reference_scores, use.names = FALSE)
 
-  curve <- repetitions[[1L]]$mv_curve
-  curve$volume <- rowMeans(volume_matrix)
-  curve$volume_normalized <- rowMeans(normalized_matrix)
+  result <- aumvc_from_scores(
+    evaluation_scores,
+    combined_scores,
+    reference$box$volume,
+    score_direction,
+    alpha_grid,
+    reference$box$log_volume
+  )
+  curve <- result$mv_curve
+  occupancy_se <- sqrt(
+    curve$volume_normalized * (1 - curve$volume_normalized) /
+      length(combined_scores)
+  )
+  curve$volume_normalized_mc_se <- occupancy_se
+  curve$volume_mc_se <- vapply(occupancy_se, function(value) {
+    if (value == 0) return(0)
+    exp_if_representable(reference$box$log_volume + log(value))
+  }, numeric(1))
 
-  if (length(values) > 1L) {
-    curve$volume_mc_se <- apply(volume_matrix, 1L, function(x) {
-      if (all(is.finite(x))) sd(x) / sqrt(length(x)) else NA_real_
-    })
-    curve$volume_normalized_mc_se <- apply(normalized_matrix, 1L, sd) / sqrt(length(values))
-    mc_sd <- if (all(is.finite(values))) sd(values) else NA_real_
-    mc_se <- if (is.finite(mc_sd)) mc_sd / sqrt(length(values)) else NA_real_
-    normalized_mc_sd <- sd(normalized)
-    normalized_mc_se <- normalized_mc_sd / sqrt(length(normalized))
+  normalized_mc_sd <- sd(result$mc_contribution)
+  normalized_mc_se <- normalized_mc_sd / sqrt(length(result$mc_contribution))
+  mc_sd <- if (normalized_mc_sd == 0) {
+    0
   } else {
-    curve$volume_mc_se <- NA_real_
-    curve$volume_normalized_mc_se <- NA_real_
-    mc_sd <- mc_se <- normalized_mc_sd <- normalized_mc_se <- NA_real_
+    exp_if_representable(reference$box$log_volume + log(normalized_mc_sd))
   }
-
+  mc_se <- if (normalized_mc_se == 0) {
+    0
+  } else {
+    exp_if_representable(reference$box$log_volume + log(normalized_mc_se))
+  }
+  relative_mc_se <- if (result$aumvc_normalized > 0) {
+    normalized_mc_se / result$aumvc_normalized
+  } else {
+    NA_real_
+  }
+  hit_count_matrix <- matrix(curve$hit_count, ncol = 1L)
   list(
     mv_curve = curve,
-    aumvc = mean(values),
-    aumvc_normalized = mean(normalized),
+    hit_count_matrix = hit_count_matrix,
+    mc_contribution = result$mc_contribution,
+    aumvc = result$aumvc,
+    aumvc_log = result$aumvc_log,
+    aumvc_normalized = result$aumvc_normalized,
     aumvc_mc_sd = mc_sd,
     aumvc_mc_se = mc_se,
     aumvc_normalized_mc_sd = normalized_mc_sd,
-    aumvc_normalized_mc_se = normalized_mc_se
+    aumvc_normalized_mc_se = normalized_mc_se,
+    aumvc_relative_mc_se = relative_mc_se,
+    minimum_hit_count = min(curve$hit_count),
+    zero_occupancy = mean(curve$hit_count == 0),
+    low_occupancy = mean(curve$hit_count < 10)
   )
 }

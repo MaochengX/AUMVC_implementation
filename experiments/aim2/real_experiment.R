@@ -8,8 +8,10 @@ if (length(settings$real_datasets) == 0L) stop("Select at least one real dataset
 outputs <- lapply(settings$real_datasets, function(dataset) {
   data <- aim2_load_real(dataset)
   aim2_run_dataset(
-    data$x, data$labels, display_names[[dataset]],
-    settings$split_counts[[dataset]], settings
+    data$x,
+    data$labels,
+    display_names[[dataset]],
+    settings
   )
 })
 
@@ -22,4 +24,7 @@ rows <- do.call(rbind, lapply(outputs, aim2_report_rows))
 total_label <- paste0("TOTAL across ", length(outputs), " datasets and ",
                       settings$n_runs, " runs per dataset")
 total_rows <- aim2_comparison_rows(total_label, total)
-aim2_save_report(rbind(rows, total_rows), "real")
+directory <- aim2_next_experiment("experiments/aim2/result/real")
+path <- file.path(directory, "real_results.csv")
+aim2_save_csv(rbind(rows, total_rows), path)
+cat("Saved: ", path, "\n", sep = "")

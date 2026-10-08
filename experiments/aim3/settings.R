@@ -1,6 +1,6 @@
 AIM3_SETTINGS <- list(
   seed = 1234L,
-  n_runs = 10L,
+  n_runs = 50L,
   synthetic = list(
     n = 1000L,
     ambient_dims = c(80L, 200L, 400L),
@@ -23,7 +23,10 @@ AIM3_SETTINGS <- list(
     label_eval = 200L
   ),
   detector = list(nu = 0.5),
-  embedding = list(method = "mds"),
+  embedding = list(
+    methods = c("mds", "isomap"),
+    isomap_k = 10L
+  ),
   goix_subsampling = list(
     n_subsets = 50L,
     subset_dim = 5L
@@ -47,6 +50,10 @@ AIM3_SETTINGS <- list(
     )
   ),
   n_reference = 100000L,
-  n_mc_repetitions = 5L,
+  n_mc_repetitions = 1L,
+  reference_chunk_size = 5000L,
+  minimum_feature_fraction = 0.10,
+  minimum_hit_count = 10L,
+  maximum_relative_mc_se = 0.10,
   aumvc_alpha_grid = seq(0.9, 0.999, by = 0.0001)
 )

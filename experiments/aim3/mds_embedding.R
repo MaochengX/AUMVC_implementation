@@ -44,12 +44,19 @@ aim3_fit_mds <- function(landmarks, ndim) {
     stop("MDS coordinates are rank deficient.", call. = FALSE)
   }
 
-  list(
+  model <- list(
     landmarks = landmarks,
     points = points,
     landmark_norm = rowMeans(distance_squared) - mean(distance_squared) / 2,
     gram_inverse = solve(gram)
   )
+  reconstructed <- aim3_project_mds(model, landmarks)
+  error <- max(abs(reconstructed - points))
+  scale <- max(1, max(abs(points)))
+  if (!is.finite(error) || error > 1e-6 * scale) {
+    stop("MDS out-of-sample projection failed its landmark check.", call. = FALSE)
+  }
+  model
 }
 
 aim3_squared_cross_distance <- function(x, y) {

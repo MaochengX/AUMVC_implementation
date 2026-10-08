@@ -8,6 +8,35 @@ trapezoid_area <- function(x, y) {
   sum(diff(x) * (head(y, -1L) + tail(y, -1L)) / 2)
 }
 
+log_sum_exp <- function(values) {
+  values <- as.numeric(values)
+  if (any(values == Inf, na.rm = TRUE)) return(Inf)
+  finite <- is.finite(values)
+  if (!any(finite)) return(-Inf)
+  maximum <- max(values[finite])
+  maximum + log(sum(exp(values[finite] - maximum)))
+}
+
+log_mean_exp <- function(values) {
+  log_sum_exp(values) - log(length(values))
+}
+
+log_trapezoid_area <- function(x, log_y) {
+  widths <- diff(x) / 2
+  terms <- vapply(seq_along(widths), function(index) {
+    if (widths[index] <= 0) return(-Inf)
+    log(widths[index]) + log_sum_exp(log_y[c(index, index + 1L)])
+  }, numeric(1))
+  log_sum_exp(terms)
+}
+
+exp_if_representable <- function(log_value) {
+  if (is.na(log_value)) return(NA_real_)
+  if (is.infinite(log_value) && log_value < 0) return(0)
+  if (!is.finite(log_value) || log_value > log(.Machine$double.xmax)) return(Inf)
+  exp(log_value)
+}
+
 fit_reference_box <- function(x_reference) {
   x_reference <- validate_matrix(x_reference, "x_reference")
   lower <- apply(x_reference, 2L, min)
@@ -36,20 +65,30 @@ fit_reference_box <- function(x_reference) {
 
 sample_reference_points <- function(box, n_reference, seed) {
   set.seed(seed)
-  x <- matrix(runif(n_reference * box$dimension), nrow = n_reference)
+  x <- matrix(
+    runif(n_reference * box$dimension),
+    nrow = n_reference,
+    byrow = TRUE
+  )
   x <- sweep(x, 2L, box$width, "*")
   sweep(x, 2L, box$lower, "+")
 }
 
 make_reference <- function(
     x_reference,
-    n_reference = 20000L,
-    n_mc_repetitions = 5L,
-    seed = 2030L
+    n_reference = 100000L,
+    n_mc_repetitions = 1L,
+    seed = 1234L,
+    chunk_size = 5000L
 ) {
   n_reference <- as.integer(n_reference)
   n_mc_repetitions <- as.integer(n_mc_repetitions)
-  if (n_reference < 1L || n_mc_repetitions < 1L) {
+  chunk_size <- as.integer(chunk_size)
+  if (
+    n_reference < 1L ||
+    n_mc_repetitions < 1L ||
+    chunk_size < 1L
+  ) {
     stop("Reference sample sizes must be positive.", call. = FALSE)
   }
 
@@ -57,18 +96,33 @@ make_reference <- function(
     box = fit_reference_box(x_reference),
     n_reference = n_reference,
     n_mc_repetitions = n_mc_repetitions,
-    seeds = seed + seq_len(n_mc_repetitions) - 1L
+    seeds = seed + seq_len(n_mc_repetitions) - 1L,
+    chunk_size = min(chunk_size, n_reference)
   )
 }
 
 score_reference_repetitions <- function(reference, score_fun) {
   lapply(seq_len(reference$n_mc_repetitions), function(r) {
-    points <- sample_reference_points(
-      reference$box,
-      reference$n_reference,
-      reference$seeds[r]
-    )
-    validate_scores(score_fun(points), reference$n_reference, "reference_scores")
+    set.seed(reference$seeds[r])
+    scores <- numeric(reference$n_reference)
+    starts <- seq(1L, reference$n_reference, by = reference$chunk_size)
+    for (start in starts) {
+      end <- min(start + reference$chunk_size - 1L, reference$n_reference)
+      size <- end - start + 1L
+      points <- matrix(
+        runif(size * reference$box$dimension),
+        nrow = size,
+        byrow = TRUE
+      )
+      points <- sweep(points, 2L, reference$box$width, "*")
+      points <- sweep(points, 2L, reference$box$lower, "+")
+      scores[start:end] <- validate_scores(
+        score_fun(points),
+        size,
+        "reference_scores"
+      )
+    }
+    scores
   })
 }
 
