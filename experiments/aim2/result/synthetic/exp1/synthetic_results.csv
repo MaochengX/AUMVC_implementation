@@ -1,0 +1,13 @@
+"dataset","detector","AUMVC","AUMVC_normalized","AUMVC_normalized_MC_SE","AUMVC_relative_MC_SE","minimum_hit_count","reliable_runs","ROC_AUC","PR_AUC","comparison","metric","matches","compared","percentage"
+"Synthetic - 50 runs","OCSVM","1.9815 +/- 0.1126","0.0663 +/- 0.0041","0.0001","0.0019",41082,50,"0.9353 +/- 0.0132","0.5007 +/- 0.0651","","",,,
+"Synthetic - 50 runs","LOF","2.0458 +/- 0.1047","0.0685 +/- 0.0039","0.0001","0.0018",42931,50,"0.8498 +/- 0.0359","0.4064 +/- 0.0795","","",,,
+"Synthetic - 50 runs","Isolation_Forest","1.9874 +/- 0.1098","0.0665 +/- 0.0040","0.0001","0.0019",41551,50,"0.9335 +/- 0.0128","0.5003 +/- 0.0638","","",,,
+"Synthetic - 50 runs","","","","","",,,"","","strict","AUMVC vs ROC-AUC",113,150,"75.3333"
+"Synthetic - 50 runs","","","","","",,,"","","uncertainty_aware","AUMVC vs ROC-AUC",111,146,"76.0274"
+"Synthetic - 50 runs","","","","","",,,"","","strict","AUMVC vs PR-AUC",109,150,"72.6667"
+"Synthetic - 50 runs","","","","","",,,"","","uncertainty_aware","AUMVC vs PR-AUC",107,146,"73.2877"
+"Synthetic - 50 runs","","","","","",,,"","","strict","AUMVC vs ROC/PR consensus",104,136,"76.4706"
+"Synthetic - 50 runs","","","","","",,,"","","uncertainty_aware","AUMVC vs ROC/PR consensus",102,132,"77.2727"
+"Synthetic - 50 runs","","","","","",,,"","","dataset_mean","AUMVC vs ROC-AUC",3,3,"100.0000"
+"Synthetic - 50 runs","","","","","",,,"","","dataset_mean","AUMVC vs PR-AUC",3,3,"100.0000"
+"Synthetic - 50 runs","","","","","",,,"","","dataset_mean","AUMVC vs ROC/PR consensus",3,3,"100.0000"

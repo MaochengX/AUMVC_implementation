@@ -1,0 +1,70 @@
+"dataset","detector","AUMVC","AUMVC_normalized","AUMVC_normalized_MC_SE","AUMVC_relative_MC_SE","minimum_hit_count","reliable_runs","ROC_AUC","PR_AUC","comparison","metric","matches","compared","percentage"
+"Adult - 50 runs","OCSVM","566.7921 +/- 42.2574","0.0008 +/- 0.0002","1.9123e-05","0.0243",80,50,"0.6204 +/- 0.0130","0.1956 +/- 0.0124","","",,,
+"Adult - 50 runs","LOF","10423.4577 +/- 10011.4381","0.0146 +/- 0.0139","7.3437e-05","0.0084",144,50,"0.5456 +/- 0.0126","0.1121 +/- 0.0043","","",,,
+"Adult - 50 runs","Isolation_Forest","233.7411 +/- 57.7332","0.0003 +/- 9.7668e-05","1.0203e-05","0.0325",11,50,"0.6422 +/- 0.0142","0.2473 +/- 0.0162","","",,,
+"Adult - 50 runs","","","","","",,,"","","strict","AUMVC vs ROC-AUC",150,150,"100.0000"
+"Adult - 50 runs","","","","","",,,"","","uncertainty_aware","AUMVC vs ROC-AUC",150,150,"100.0000"
+"Adult - 50 runs","","","","","",,,"","","strict","AUMVC vs PR-AUC",150,150,"100.0000"
+"Adult - 50 runs","","","","","",,,"","","uncertainty_aware","AUMVC vs PR-AUC",150,150,"100.0000"
+"Adult - 50 runs","","","","","",,,"","","strict","AUMVC vs ROC/PR consensus",150,150,"100.0000"
+"Adult - 50 runs","","","","","",,,"","","uncertainty_aware","AUMVC vs ROC/PR consensus",150,150,"100.0000"
+"Adult - 50 runs","","","","","",,,"","","dataset_mean","AUMVC vs ROC-AUC",3,3,"100.0000"
+"Adult - 50 runs","","","","","",,,"","","dataset_mean","AUMVC vs PR-AUC",3,3,"100.0000"
+"Adult - 50 runs","","","","","",,,"","","dataset_mean","AUMVC vs ROC/PR consensus",3,3,"100.0000"
+"HTTP - 50 runs","OCSVM","3.1153 +/- 0.3040","0.0004 +/- 4.6242e-05","1.0583e-05","0.0252",40,50,"0.9937 +/- 0.0003","0.2082 +/- 0.0127","","",,,
+"HTTP - 50 runs","LOF","34.4425 +/- 16.0865","0.0046 +/- 0.0019","4.8209e-05","0.0110",211,50,"0.2944 +/- 0.0127","0.0486 +/- 0.0154","","",,,
+"HTTP - 50 runs","Isolation_Forest","20.1069 +/- 3.9866","0.0027 +/- 0.0005","2.5015e-05","0.0094",148,50,"0.9994 +/- 0.0006","0.6399 +/- 0.2139","","",,,
+"HTTP - 50 runs","","","","","",,,"","","strict","AUMVC vs ROC-AUC",90,150,"60.0000"
+"HTTP - 50 runs","","","","","",,,"","","uncertainty_aware","AUMVC vs ROC-AUC",90,149,"60.4027"
+"HTTP - 50 runs","","","","","",,,"","","strict","AUMVC vs PR-AUC",90,150,"60.0000"
+"HTTP - 50 runs","","","","","",,,"","","uncertainty_aware","AUMVC vs PR-AUC",90,149,"60.4027"
+"HTTP - 50 runs","","","","","",,,"","","strict","AUMVC vs ROC/PR consensus",90,150,"60.0000"
+"HTTP - 50 runs","","","","","",,,"","","uncertainty_aware","AUMVC vs ROC/PR consensus",90,149,"60.4027"
+"HTTP - 50 runs","","","","","",,,"","","dataset_mean","AUMVC vs ROC-AUC",2,3,"66.6667"
+"HTTP - 50 runs","","","","","",,,"","","dataset_mean","AUMVC vs PR-AUC",2,3,"66.6667"
+"HTTP - 50 runs","","","","","",,,"","","dataset_mean","AUMVC vs ROC/PR consensus",2,3,"66.6667"
+"Pima - 50 runs","OCSVM","11180.8879 +/- 5187.5311","0.0308 +/- 0.0135","0.0001","0.0040",2716,50,"0.7049 +/- 0.0875","0.2118 +/- 0.0829","","",,,
+"Pima - 50 runs","LOF","14546.9757 +/- 8303.9456","0.0384 +/- 0.0171","9.6562e-05","0.0031",2682,50,"0.7153 +/- 0.0749","0.1952 +/- 0.0661","","",,,
+"Pima - 50 runs","Isolation_Forest","8164.8251 +/- 3525.1959","0.0227 +/- 0.0102","9.8046e-05","0.0050",2470,50,"0.7325 +/- 0.0789","0.2425 +/- 0.1023","","",,,
+"Pima - 50 runs","","","","","",,,"","","strict","AUMVC vs ROC-AUC",89,149,"59.7315"
+"Pima - 50 runs","","","","","",,,"","","uncertainty_aware","AUMVC vs ROC-AUC",87,147,"59.1837"
+"Pima - 50 runs","","","","","",,,"","","strict","AUMVC vs PR-AUC",100,150,"66.6667"
+"Pima - 50 runs","","","","","",,,"","","uncertainty_aware","AUMVC vs PR-AUC",99,148,"66.8919"
+"Pima - 50 runs","","","","","",,,"","","strict","AUMVC vs ROC/PR consensus",73,107,"68.2243"
+"Pima - 50 runs","","","","","",,,"","","uncertainty_aware","AUMVC vs ROC/PR consensus",72,106,"67.9245"
+"Pima - 50 runs","","","","","",,,"","","dataset_mean","AUMVC vs ROC-AUC",2,3,"66.6667"
+"Pima - 50 runs","","","","","",,,"","","dataset_mean","AUMVC vs PR-AUC",3,3,"100.0000"
+"Pima - 50 runs","","","","","",,,"","","dataset_mean","AUMVC vs ROC/PR consensus",2,2,"100.0000"
+"SMTP - 50 runs","OCSVM","7.7355 +/- 0.4097","0.0019 +/- 0.0010","2.9953e-05","0.0171",264,50,"0.8567 +/- 0.0564","0.3780 +/- 0.1457","","",,,
+"SMTP - 50 runs","LOF","13.9111 +/- 1.8446","0.0034 +/- 0.0017","4.2479e-05","0.0136",522,50,"0.8799 +/- 0.0532","0.0839 +/- 0.0747","","",,,
+"SMTP - 50 runs","Isolation_Forest","75.0398 +/- 27.0409","0.0158 +/- 0.0031","5.1546e-05","0.0034",218,50,"0.9099 +/- 0.0256","0.0040 +/- 0.0010","","",,,
+"SMTP - 50 runs","","","","","",,,"","","strict","AUMVC vs ROC-AUC",27,150,"18.0000"
+"SMTP - 50 runs","","","","","",,,"","","uncertainty_aware","AUMVC vs ROC-AUC",27,150,"18.0000"
+"SMTP - 50 runs","","","","","",,,"","","strict","AUMVC vs PR-AUC",149,150,"99.3333"
+"SMTP - 50 runs","","","","","",,,"","","uncertainty_aware","AUMVC vs PR-AUC",149,150,"99.3333"
+"SMTP - 50 runs","","","","","",,,"","","strict","AUMVC vs ROC/PR consensus",27,28,"96.4286"
+"SMTP - 50 runs","","","","","",,,"","","uncertainty_aware","AUMVC vs ROC/PR consensus",27,28,"96.4286"
+"SMTP - 50 runs","","","","","",,,"","","dataset_mean","AUMVC vs ROC-AUC",0,3,"0.0000"
+"SMTP - 50 runs","","","","","",,,"","","dataset_mean","AUMVC vs PR-AUC",3,3,"100.0000"
+"SMTP - 50 runs","","","","","",,,"","","dataset_mean","AUMVC vs ROC/PR consensus",0,0,
+"Wilt - 50 runs","OCSVM","363.4478 +/- 149.2337","0.0035 +/- 0.0021","3.0123e-05","0.0121",22,50,"0.3141 +/- 0.0299","0.0356 +/- 0.0015","","",,,
+"Wilt - 50 runs","LOF","1082.1602 +/- 832.1917","0.0086 +/- 0.0041","4.9449e-05","0.0071",52,50,"0.5932 +/- 0.0318","0.0620 +/- 0.0052","","",,,
+"Wilt - 50 runs","Isolation_Forest","995.6010 +/- 884.1213","0.0069 +/- 0.0030","3.2764e-05","0.0054",20,50,"0.4486 +/- 0.0385","0.0442 +/- 0.0032","","",,,
+"Wilt - 50 runs","","","","","",,,"","","strict","AUMVC vs ROC-AUC",13,150,"8.6667"
+"Wilt - 50 runs","","","","","",,,"","","uncertainty_aware","AUMVC vs ROC-AUC",13,149,"8.7248"
+"Wilt - 50 runs","","","","","",,,"","","strict","AUMVC vs PR-AUC",13,150,"8.6667"
+"Wilt - 50 runs","","","","","",,,"","","uncertainty_aware","AUMVC vs PR-AUC",13,149,"8.7248"
+"Wilt - 50 runs","","","","","",,,"","","strict","AUMVC vs ROC/PR consensus",13,150,"8.6667"
+"Wilt - 50 runs","","","","","",,,"","","uncertainty_aware","AUMVC vs ROC/PR consensus",13,149,"8.7248"
+"Wilt - 50 runs","","","","","",,,"","","dataset_mean","AUMVC vs ROC-AUC",0,3,"0.0000"
+"Wilt - 50 runs","","","","","",,,"","","dataset_mean","AUMVC vs PR-AUC",0,3,"0.0000"
+"Wilt - 50 runs","","","","","",,,"","","dataset_mean","AUMVC vs ROC/PR consensus",0,3,"0.0000"
+"TOTAL across 5 datasets and 50 runs per dataset","","","","","",,,"","","strict","AUMVC vs ROC-AUC",369,749,"49.2657"
+"TOTAL across 5 datasets and 50 runs per dataset","","","","","",,,"","","uncertainty_aware","AUMVC vs ROC-AUC",367,745,"49.2617"
+"TOTAL across 5 datasets and 50 runs per dataset","","","","","",,,"","","strict","AUMVC vs PR-AUC",502,750,"66.9333"
+"TOTAL across 5 datasets and 50 runs per dataset","","","","","",,,"","","uncertainty_aware","AUMVC vs PR-AUC",501,746,"67.1582"
+"TOTAL across 5 datasets and 50 runs per dataset","","","","","",,,"","","strict","AUMVC vs ROC/PR consensus",353,585,"60.3419"
+"TOTAL across 5 datasets and 50 runs per dataset","","","","","",,,"","","uncertainty_aware","AUMVC vs ROC/PR consensus",352,582,"60.4811"
+"TOTAL across 5 datasets and 50 runs per dataset","","","","","",,,"","","dataset_mean","AUMVC vs ROC-AUC",7,15,"46.6667"
+"TOTAL across 5 datasets and 50 runs per dataset","","","","","",,,"","","dataset_mean","AUMVC vs PR-AUC",11,15,"73.3333"
+"TOTAL across 5 datasets and 50 runs per dataset","","","","","",,,"","","dataset_mean","AUMVC vs ROC/PR consensus",7,11,"63.6364"
