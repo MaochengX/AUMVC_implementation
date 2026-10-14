@@ -6,8 +6,8 @@ display_names <- c(adult = "Adult", http = "HTTP", pima = "Pima",
                    smtp = "SMTP", wilt = "Wilt")
 if (length(settings$real_datasets) == 0L) stop("Select at least one real dataset.")
 outputs <- lapply(settings$real_datasets, function(dataset) {
-  data <- aim2_load_real(dataset)
-  aim2_run_dataset(
+  data <- load_real(dataset)
+  run_dataset(
     data$x,
     data$labels,
     display_names[[dataset]],
@@ -17,14 +17,14 @@ outputs <- lapply(settings$real_datasets, function(dataset) {
 
 cat("\nTOTAL across ", length(outputs), " datasets and ", settings$n_runs,
     " runs per dataset\n", sep = "")
-total <- aim2_total_concordance(outputs)
+total <- total_concordance(outputs)
 print(total, row.names = FALSE)
 
-rows <- do.call(rbind, lapply(outputs, aim2_report_rows))
+rows <- do.call(rbind, lapply(outputs, report_rows))
 total_label <- paste0("TOTAL across ", length(outputs), " datasets and ",
                       settings$n_runs, " runs per dataset")
-total_rows <- aim2_comparison_rows(total_label, total)
-directory <- aim2_next_experiment("experiments/aim2/result/real")
+total_rows <- comparison_rows(total_label, total)
+directory <- next_experiment("experiments/aim2/result/real")
 path <- file.path(directory, "real_results.csv")
-aim2_save_csv(rbind(rows, total_rows), path)
+save_csv(rbind(rows, total_rows), path)
 cat("Saved: ", path, "\n", sep = "")

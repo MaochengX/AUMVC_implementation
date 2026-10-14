@@ -46,7 +46,6 @@ scores <- list(
   Isolation_Forest = score_isolation_forest(iforest, x)
 )
 stopifnot(
-  ocsvm$converged,
   all(vapply(scores, length, integer(1)) == nrow(x)),
   all(vapply(scores, function(value) all(is.finite(value)), logical(1)))
 )

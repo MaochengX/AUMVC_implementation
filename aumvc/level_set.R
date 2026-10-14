@@ -63,17 +63,6 @@ fit_reference_box <- function(x_reference) {
   )
 }
 
-sample_reference_points <- function(box, n_reference, seed) {
-  set.seed(seed)
-  x <- matrix(
-    runif(n_reference * box$dimension),
-    nrow = n_reference,
-    byrow = TRUE
-  )
-  x <- sweep(x, 2L, box$width, "*")
-  sweep(x, 2L, box$lower, "+")
-}
-
 make_reference <- function(
     x_reference,
     n_reference = 100000L,

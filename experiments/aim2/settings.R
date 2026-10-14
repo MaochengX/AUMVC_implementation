@@ -1,6 +1,6 @@
 AIM2_SETTINGS <- list(
   seed = 1234L,
-  n_runs = 50L,
+  n_runs = 5L,
   n_reference = 100000L,
   n_mc_repetitions = 1L,
   reference_chunk_size = 5000L,

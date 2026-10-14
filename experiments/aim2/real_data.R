@@ -1,4 +1,4 @@
-aim2_load_adult <- function() {
+load_adult <- function() {
   columns <- c(
     "age", "workclass", "fnlwgt", "education", "education_num",
     "marital_status", "occupation", "relationship", "race", "sex",
@@ -23,13 +23,13 @@ aim2_load_adult <- function() {
        labels = as.integer(data$income == ">50K"))
 }
 
-aim2_load_labeled_csv <- function(name) {
+load_labeled_csv <- function(name) {
   data <- read.csv(file.path("dataset", name, paste0(name, ".csv")))
   list(x = as.matrix(data[, names(data) != "label", drop = FALSE]),
        labels = data$label)
 }
 
-aim2_load_wilt <- function() {
+load_wilt <- function() {
   data <- rbind(
     read.csv("dataset/wilt/training.csv", stringsAsFactors = FALSE),
     read.csv("dataset/wilt/testing.csv", stringsAsFactors = FALSE)
@@ -39,13 +39,13 @@ aim2_load_wilt <- function() {
        labels = as.integer(tolower(trimws(data$class)) == "w"))
 }
 
-aim2_load_real <- function(name) {
+load_real <- function(name) {
   switch(name,
-    adult = aim2_load_adult(),
-    http = aim2_load_labeled_csv("http"),
-    pima = aim2_load_labeled_csv("pima"),
-    smtp = aim2_load_labeled_csv("smtp"),
-    wilt = aim2_load_wilt(),
+    adult = load_adult(),
+    http = load_labeled_csv("http"),
+    pima = load_labeled_csv("pima"),
+    smtp = load_labeled_csv("smtp"),
+    wilt = load_wilt(),
     stop("Unknown Aim 2 dataset: ", name, call. = FALSE)
   )
 }

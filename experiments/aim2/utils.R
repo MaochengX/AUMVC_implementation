@@ -1,4 +1,4 @@
-aim2_make_splits <- function(labels, counts, split_names, seed) {
+make_splits <- function(labels, counts, split_names, seed) {
   labels <- as.integer(labels)
   counts <- as.integer(counts)
 
@@ -48,7 +48,7 @@ aim2_make_splits <- function(labels, counts, split_names, seed) {
   splits
 }
 
-aim2_limit_contamination <- function(x, labels, maximum, seed) {
+limit_contamination <- function(x, labels, maximum, seed) {
   positive <- which(labels == 1L)
   negative <- which(labels == 0L)
   maximum_positive <- floor(maximum * length(negative) / (1 - maximum))
@@ -65,7 +65,7 @@ aim2_limit_contamination <- function(x, labels, maximum, seed) {
   )
 }
 
-aim2_split_counts <- function(n, settings) {
+split_counts <- function(n, settings) {
   fractions <- settings$split_fractions
   maximums <- settings$split_maximums[names(fractions)]
   counts <- pmin(floor(n * fractions), maximums)
@@ -125,12 +125,12 @@ pr_auc_score <- function(labels, scores) {
 
 format_mean_sd <- function(mean_value, sd_value) {
   if (!is.finite(mean_value)) return(as.character(mean_value))
-  mean_text <- aim2_format_number(mean_value)
+  mean_text <- format_number(mean_value)
   if (is.na(sd_value)) return(mean_text)
-  paste0(mean_text, " +/- ", aim2_format_number(sd_value))
+  paste0(mean_text, " +/- ", format_number(sd_value))
 }
 
-aim2_format_number <- function(value) {
+format_number <- function(value) {
   if (is.na(value)) return(NA_character_)
   if (!is.finite(value)) return(as.character(value))
   if (value != 0 && (abs(value) < 1e-4 || abs(value) >= 1e6)) {
@@ -139,7 +139,7 @@ aim2_format_number <- function(value) {
   sprintf("%.4f", value)
 }
 
-aim2_next_experiment <- function(root) {
+next_experiment <- function(root) {
   dir.create(root, recursive = TRUE, showWarnings = FALSE)
   entries <- list.dirs(root, recursive = FALSE, full.names = FALSE)
   numbers <- suppressWarnings(as.integer(sub("^exp", "", entries)))
@@ -149,16 +149,17 @@ aim2_next_experiment <- function(root) {
   path
 }
 
-aim2_save_csv <- function(result, path) {
+save_csv <- function(result, path) {
   numeric_columns <- vapply(result, is.numeric, logical(1))
   numeric_columns[names(numeric_columns) %in% c(
     "minimum_hit_count",
     "reliable_runs",
-    "matches",
-    "compared"
+    "matching_pairs",
+    "compared_pairs",
+    "total_pairs"
   )] <- FALSE
   result[numeric_columns] <- lapply(result[numeric_columns], function(column) {
-    vapply(column, aim2_format_number, character(1))
+    vapply(column, format_number, character(1))
   })
   utils::write.csv(result, path, row.names = FALSE, na = "")
   path

@@ -16,13 +16,13 @@ labels <- c(
   rep(1L, settings$synthetic$n_anomaly)
 )
 
-output <- aim2_run_dataset(
+output <- run_dataset(
   x,
   labels,
   "Synthetic",
   settings
 )
-directory <- aim2_next_experiment("experiments/aim2/result/synthetic")
+directory <- next_experiment("experiments/aim2/result/synthetic")
 path <- file.path(directory, "synthetic_results.csv")
-aim2_save_csv(aim2_report_rows(output), path)
+save_csv(report_rows(output), path)
 cat("Saved: ", path, "\n", sep = "")

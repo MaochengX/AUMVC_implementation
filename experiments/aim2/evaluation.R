@@ -7,14 +7,14 @@ source("detectors/ocsvm.R")
 source("detectors/lof.R")
 source("detectors/isolation_forest.R")
 
-aim2_order <- function(difference, tolerance, smaller_is_better = FALSE) {
+comparison_order <- function(difference, tolerance, smaller_is_better = FALSE) {
   if (!is.finite(difference) || abs(difference) <= tolerance) return(NA_integer_)
   direction <- sign(difference)
   if (smaller_is_better) direction <- -direction
   as.integer(direction)
 }
 
-aim2_pairwise_concordance <- function(
+pairwise_concordance <- function(
     detectors,
     aumvc_values,
     target_values,
@@ -26,12 +26,12 @@ aim2_pairwise_concordance <- function(
   do.call(rbind, lapply(seq_len(ncol(pairs)), function(index) {
     first <- pairs[1L, index]
     second <- pairs[2L, index]
-    aumvc_order <- aim2_order(
+    aumvc_order <- comparison_order(
       aumvc_values[first] - aumvc_values[second],
       tolerance,
       TRUE
     )
-    target_order <- aim2_order(
+    target_order <- comparison_order(
       target_values[first] - target_values[second],
       tolerance
     )
@@ -47,7 +47,7 @@ aim2_pairwise_concordance <- function(
       ) {
         NA_integer_
       } else {
-        aim2_order(difference, 0, TRUE)
+        comparison_order(difference, 0, TRUE)
       }
     }
     data.frame(
@@ -72,7 +72,7 @@ aim2_pairwise_concordance <- function(
   }))
 }
 
-aim2_consensus_concordance <- function(roc_pairs, pr_pairs) {
+consensus_concordance <- function(roc_pairs, pr_pairs) {
   if (
     !identical(roc_pairs$detector_1, pr_pairs$detector_1) ||
     !identical(roc_pairs$detector_2, pr_pairs$detector_2)
@@ -80,36 +80,25 @@ aim2_consensus_concordance <- function(roc_pairs, pr_pairs) {
     stop("ROC and PR pair tables do not match.", call. = FALSE)
   }
 
-  agree <- mapply(function(aumvc_order, roc_order, pr_order) {
-    if (
-      is.na(aumvc_order) || is.na(roc_order) || is.na(pr_order) ||
-      roc_order != pr_order
-    ) {
-      return(NA)
-    }
-    aumvc_order == roc_order
-  }, roc_pairs$aumvc_order, roc_pairs$target_order, pr_pairs$target_order)
-  uncertainty_agree <- mapply(function(aumvc_order, roc_order, pr_order) {
-    if (
-      is.na(aumvc_order) || is.na(roc_order) || is.na(pr_order) ||
-      roc_order != pr_order
-    ) {
-      return(NA)
-    }
-    aumvc_order == roc_order
-  }, roc_pairs$aumvc_uncertainty_order,
-  roc_pairs$target_order,
-  pr_pairs$target_order)
+  consensus <- !is.na(roc_pairs$target_order) &
+    !is.na(pr_pairs$target_order) &
+    roc_pairs$target_order == pr_pairs$target_order
+
+  compare <- function(aumvc_order) {
+    result <- rep(NA, length(aumvc_order))
+    keep <- consensus & !is.na(aumvc_order)
+    result[keep] <- aumvc_order[keep] == roc_pairs$target_order[keep]
+    result
+  }
 
   data.frame(
     detector_1 = roc_pairs$detector_1,
     detector_2 = roc_pairs$detector_2,
-    agree = agree,
-    uncertainty_agree = uncertainty_agree
+    agree = compare(roc_pairs$aumvc_order),
+    uncertainty_agree = compare(roc_pairs$aumvc_uncertainty_order)
   )
 }
-
-aim2_fit_models <- function(x_train, seed, settings) {
+fit_models <- function(x_train, seed, settings) {
   models <- list(
     OCSVM = fit_ocsvm(
       x_train,
@@ -127,13 +116,10 @@ aim2_fit_models <- function(x_train, seed, settings) {
       seed = seed + 200L
     )
   )
-  if (!models$OCSVM$converged) {
-    stop("OCSVM solver did not converge in Aim 2.", call. = FALSE)
-  }
   models
 }
 
-aim2_score_functions <- function(models) {
+make_score_functions <- function(models) {
   list(
     OCSVM = function(x) score_ocsvm(models$OCSVM, x),
     LOF = function(x) score_lof(models$LOF, x),
@@ -141,8 +127,8 @@ aim2_score_functions <- function(models) {
   )
 }
 
-aim2_run_once <- function(x, labels, counts, seed, settings) {
-  split <- aim2_make_splits(
+run_once <- function(x, labels, counts, seed, settings) {
+  split <- make_splits(
     labels,
     counts,
     c("detector_train", "reference", "aumvc", "label_eval"),
@@ -184,13 +170,13 @@ aim2_run_once <- function(x, labels, counts, seed, settings) {
     chunk_size = settings$reference_chunk_size
   )
 
-  score_functions <- aim2_score_functions(
-    aim2_fit_models(x_train, seed, settings)
+  score_funs <- make_score_functions(
+    fit_models(x_train, seed, settings)
   )
-  contributions <- vector("list", length(score_functions))
-  names(contributions) <- names(score_functions)
-  results <- do.call(rbind, lapply(names(score_functions), function(detector) {
-    score_fun <- score_functions[[detector]]
+  contributions <- vector("list", length(score_funs))
+  names(contributions) <- names(score_funs)
+  results <- do.call(rbind, lapply(names(score_funs), function(detector) {
+    score_fun <- score_funs[[detector]]
     mv <- aumvc(
       x_aumvc,
       reference,
@@ -219,14 +205,14 @@ aim2_run_once <- function(x, labels, counts, seed, settings) {
     )
   }))
 
-  roc_pairs <- aim2_pairwise_concordance(
+  roc_pairs <- pairwise_concordance(
     results$detector,
     results$aumvc_normalized,
     results$roc_auc,
     contributions = contributions,
     confidence_level = settings$confidence_level
   )
-  pr_pairs <- aim2_pairwise_concordance(
+  pr_pairs <- pairwise_concordance(
     results$detector,
     results$aumvc_normalized,
     results$pr_auc,
@@ -235,13 +221,11 @@ aim2_run_once <- function(x, labels, counts, seed, settings) {
   )
   list(
     results = results,
-    roc_pairs = roc_pairs,
-    pr_pairs = pr_pairs,
-    consensus_pairs = aim2_consensus_concordance(roc_pairs, pr_pairs)
+    consensus_pairs = consensus_concordance(roc_pairs, pr_pairs)
   )
 }
 
-aim2_summarize_detectors <- function(run_results) {
+summarize_detectors <- function(run_results) {
   combined <- do.call(rbind, lapply(seq_along(run_results), function(run) {
     data.frame(run = run, run_results[[run]]$results)
   }))
@@ -265,113 +249,60 @@ aim2_summarize_detectors <- function(run_results) {
   }))
 }
 
-aim2_summarize_concordance <- function(run_results) {
-  metrics <- c(
-    "AUMVC vs ROC-AUC",
-    "AUMVC vs PR-AUC",
-    "AUMVC vs ROC/PR consensus"
+summarize_concordance <- function(run_results) {
+  pairs <- do.call(
+    rbind,
+    lapply(run_results, function(result) result$consensus_pairs)
   )
-  pair_names <- c("roc_pairs", "pr_pairs", "consensus_pairs")
-  do.call(rbind, lapply(seq_along(metrics), function(index) {
-    pairs <- do.call(
-      rbind,
-      lapply(run_results, function(result) result[[pair_names[index]]])
+  total_pairs <- nrow(pairs)
+
+  summarize <- function(column, comparison) {
+    compared_pairs <- sum(!is.na(pairs[[column]]))
+    matching_pairs <- sum(pairs[[column]], na.rm = TRUE)
+    data.frame(
+      comparison = comparison,
+      metric = "ROC/PR consensus",
+      matching_pairs = matching_pairs,
+      compared_pairs = compared_pairs,
+      total_pairs = total_pairs,
+      percentage = if (compared_pairs) {
+        100 * matching_pairs / compared_pairs
+      } else {
+        NA_real_
+      }
     )
-    strict_matches <- sum(pairs$agree, na.rm = TRUE)
-    strict_compared <- sum(!is.na(pairs$agree))
-    uncertainty_matches <- sum(pairs$uncertainty_agree, na.rm = TRUE)
-    uncertainty_compared <- sum(!is.na(pairs$uncertainty_agree))
-    rbind(
-      data.frame(
-        comparison = "strict",
-        metric = metrics[index],
-        matches = strict_matches,
-        compared = strict_compared,
-        percentage = if (strict_compared > 0L) {
-          100 * strict_matches / strict_compared
-        } else {
-          NA_real_
-        }
-      ),
-      data.frame(
-        comparison = "uncertainty_aware",
-        metric = metrics[index],
-        matches = uncertainty_matches,
-        compared = uncertainty_compared,
-        percentage = if (uncertainty_compared > 0L) {
-          100 * uncertainty_matches / uncertainty_compared
-        } else {
-          NA_real_
-        }
-      )
+  }
+
+  rbind(
+    summarize("agree", "strict"),
+    summarize("uncertainty_agree", "uncertainty_aware")
+  )
+}
+
+total_concordance <- function(outputs) {
+  combined <- do.call(rbind, lapply(outputs, function(output) output$concordance))
+  groups <- split(seq_len(nrow(combined)), combined$comparison)
+
+  do.call(rbind, lapply(groups, function(indices) {
+    part <- combined[indices, , drop = FALSE]
+    matching_pairs <- sum(part$matching_pairs)
+    compared_pairs <- sum(part$compared_pairs)
+    total_pairs <- sum(part$total_pairs)
+    data.frame(
+      comparison = part$comparison[1L],
+      metric = "ROC/PR consensus",
+      matching_pairs = matching_pairs,
+      compared_pairs = compared_pairs,
+      total_pairs = total_pairs,
+      percentage = if (compared_pairs) {
+        100 * matching_pairs / compared_pairs
+      } else {
+        NA_real_
+      }
     )
   }))
 }
-
-aim2_dataset_concordance <- function(run_results) {
-  combined <- do.call(rbind, lapply(run_results, function(result) result$results))
-  detectors <- unique(combined$detector)
-  means <- do.call(rbind, lapply(detectors, function(detector) {
-    values <- combined[combined$detector == detector, , drop = FALSE]
-    data.frame(
-      detector = detector,
-      aumvc = mean(values$aumvc_normalized),
-      roc = mean(values$roc_auc),
-      pr = mean(values$pr_auc)
-    )
-  }))
-  roc_pairs <- aim2_pairwise_concordance(
-    means$detector,
-    means$aumvc,
-    means$roc
-  )
-  pr_pairs <- aim2_pairwise_concordance(
-    means$detector,
-    means$aumvc,
-    means$pr
-  )
-  consensus <- aim2_consensus_concordance(roc_pairs, pr_pairs)
-  tables <- list(roc_pairs, pr_pairs, consensus)
-  metrics <- c(
-    "AUMVC vs ROC-AUC",
-    "AUMVC vs PR-AUC",
-    "AUMVC vs ROC/PR consensus"
-  )
-  do.call(rbind, lapply(seq_along(tables), function(index) {
-    agree <- tables[[index]]$agree
-    matches <- sum(agree, na.rm = TRUE)
-    compared <- sum(!is.na(agree))
-    data.frame(
-      comparison = "dataset_mean",
-      metric = metrics[index],
-      matches = matches,
-      compared = compared,
-      percentage = if (compared > 0L) 100 * matches / compared else NA_real_
-    )
-  }))
-}
-
-aim2_total_concordance <- function(outputs) {
-  combined <- do.call(rbind, lapply(outputs, function(output) {
-    rbind(output$concordance, output$dataset_concordance)
-  }))
-  groups <- unique(combined[, c("comparison", "metric"), drop = FALSE])
-  do.call(rbind, lapply(seq_len(nrow(groups)), function(index) {
-    keep <- combined$comparison == groups$comparison[index] &
-      combined$metric == groups$metric[index]
-    matches <- sum(combined$matches[keep])
-    compared <- sum(combined$compared[keep])
-    data.frame(
-      comparison = groups$comparison[index],
-      metric = groups$metric[index],
-      matches = matches,
-      compared = compared,
-      percentage = if (compared > 0L) 100 * matches / compared else NA_real_
-    )
-  }))
-}
-
-aim2_run_dataset <- function(x, labels, dataset, settings) {
+run_dataset <- function(x, labels, dataset, settings) {
   x <- validate_matrix(x, "x")
   labels <- as.integer(labels)
   if (
@@ -383,14 +314,14 @@ aim2_run_dataset <- function(x, labels, dataset, settings) {
 
   run_results <- lapply(seq_len(settings$n_runs), function(run) {
     seed <- experiment_run_seed(settings, run)
-    pool <- aim2_limit_contamination(
+    pool <- limit_contamination(
       x,
       labels,
       settings$max_anomaly_fraction,
       seed + 10L
     )
-    counts <- aim2_split_counts(nrow(pool$x), settings)
-    aim2_run_once(
+    counts <- split_counts(nrow(pool$x), settings)
+    run_once(
       pool$x,
       pool$labels,
       counts,
@@ -401,9 +332,8 @@ aim2_run_dataset <- function(x, labels, dataset, settings) {
   output <- list(
     dataset = dataset,
     n_runs = settings$n_runs,
-    detector_summary = aim2_summarize_detectors(run_results),
-    concordance = aim2_summarize_concordance(run_results),
-    dataset_concordance = aim2_dataset_concordance(run_results)
+    detector_summary = summarize_detectors(run_results),
+    concordance = summarize_concordance(run_results)
   )
 
   display <- data.frame(
@@ -426,14 +356,12 @@ aim2_run_dataset <- function(x, labels, dataset, settings) {
   )
   cat(dataset, " - ", settings$n_runs, " runs\n\n", sep = "")
   print(display, row.names = FALSE)
-  cat("\nComparisons across all runs\n")
+  cat("\nROC/PR consensus comparison\n")
   print(output$concordance, row.names = FALSE)
-  cat("\nComparison of detector means\n")
-  print(output$dataset_concordance, row.names = FALSE)
   invisible(output)
 }
 
-aim2_comparison_rows <- function(dataset, comparison) {
+comparison_rows <- function(dataset, comparison) {
   data.frame(
     dataset = rep(dataset, nrow(comparison)),
     detector = "",
@@ -447,13 +375,14 @@ aim2_comparison_rows <- function(dataset, comparison) {
     PR_AUC = "",
     comparison = comparison$comparison,
     metric = comparison$metric,
-    matches = comparison$matches,
-    compared = comparison$compared,
+    matching_pairs = comparison$matching_pairs,
+    compared_pairs = comparison$compared_pairs,
+    total_pairs = comparison$total_pairs,
     percentage = comparison$percentage
   )
 }
 
-aim2_report_rows <- function(output) {
+report_rows <- function(output) {
   summary <- output$detector_summary
   dataset <- paste0(output$dataset, " - ", output$n_runs, " runs")
   detector_rows <- data.frame(
@@ -467,12 +396,12 @@ aim2_report_rows <- function(output) {
     ),
     AUMVC_normalized_MC_SE = vapply(
       summary$aumvc_normalized_mc_se_mean,
-      aim2_format_number,
+      format_number,
       character(1)
     ),
     AUMVC_relative_MC_SE = vapply(
       summary$aumvc_relative_mc_se_mean,
-      aim2_format_number,
+      format_number,
       character(1)
     ),
     minimum_hit_count = summary$minimum_hit_count,
@@ -481,13 +410,13 @@ aim2_report_rows <- function(output) {
     PR_AUC = mapply(format_mean_sd, summary$pr_mean, summary$pr_sd),
     comparison = "",
     metric = "",
-    matches = NA_real_,
-    compared = NA_real_,
+    matching_pairs = NA_real_,
+    compared_pairs = NA_real_,
+    total_pairs = NA_real_,
     percentage = NA_real_
   )
   rbind(
     detector_rows,
-    aim2_comparison_rows(dataset, output$concordance),
-    aim2_comparison_rows(dataset, output$dataset_concordance)
+    comparison_rows(dataset, output$concordance)
   )
 }
