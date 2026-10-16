@@ -1,19 +1,20 @@
-aim3_require_manifun <- function() {
-  if (!requireNamespace("manifun", quietly = TRUE)) {
-    stop(
-      "Package 'manifun' is required. Run experiments/install_manifun.R first.",
-      call. = FALSE
-    )
-  }
-}
+fit_mds <- function(landmarks, ndim) {
+  require_manifun()
 
-aim3_fit_mds <- function(landmarks, ndim) {
-  aim3_require_manifun()
   landmarks <- as.matrix(landmarks)
+  storage.mode(landmarks) <- "double"
   ndim <- as.integer(ndim)
 
-  if (ndim < 1L || ndim >= nrow(landmarks)) {
-    stop("Invalid MDS dimension.", call. = FALSE)
+  if (
+    nrow(landmarks) < 2L ||
+    ncol(landmarks) < 1L ||
+    any(!is.finite(landmarks)) ||
+    length(ndim) != 1L ||
+    is.na(ndim) ||
+    ndim < 1L ||
+    ndim >= nrow(landmarks)
+  ) {
+    stop("Invalid MDS settings or landmark data.", call. = FALSE)
   }
 
   embed_fun <- manifun::embed
@@ -23,23 +24,23 @@ aim3_fit_mds <- function(landmarks, ndim) {
 
   distance <- stats::dist(landmarks)
   distance_squared <- as.matrix(distance)^2
-
   embedding <- embed_fun(
     distance,
     method = "mds",
     k = ndim
   )
-
   points <- as.matrix(
     manifun::extract_points(embedding, ndim = ndim)
   )
 
-  if (!identical(dim(points), c(nrow(landmarks), ndim))) {
-    stop("manifun returned an unexpected MDS size.", call. = FALSE)
+  if (
+    !identical(dim(points), c(nrow(landmarks), ndim)) ||
+    any(!is.finite(points))
+  ) {
+    stop("manifun returned invalid MDS coordinates.", call. = FALSE)
   }
 
   gram <- crossprod(points)
-
   if (qr(gram)$rank < ndim) {
     stop("MDS coordinates are rank deficient.", call. = FALSE)
   }
@@ -50,40 +51,53 @@ aim3_fit_mds <- function(landmarks, ndim) {
     landmark_norm = rowMeans(distance_squared) - mean(distance_squared) / 2,
     gram_inverse = solve(gram)
   )
-  reconstructed <- aim3_project_mds(model, landmarks)
+
+  reconstructed <- project_mds(model, landmarks)
   error <- max(abs(reconstructed - points))
   scale <- max(1, max(abs(points)))
   if (!is.finite(error) || error > 1e-6 * scale) {
     stop("MDS out-of-sample projection failed its landmark check.", call. = FALSE)
   }
+
   model
 }
 
-aim3_squared_cross_distance <- function(x, y) {
+squared_cross_distance <- function(x, y) {
+  x <- as.matrix(x)
+  y <- as.matrix(y)
+  if (
+    ncol(x) != ncol(y) ||
+    any(!is.finite(x)) ||
+    any(!is.finite(y))
+  ) {
+    stop("Invalid cross-distance inputs.", call. = FALSE)
+  }
+
   squared <- outer(rowSums(x^2), rowSums(y^2), "+") -
     2 * tcrossprod(x, y)
   pmax(squared, 0)
 }
 
-aim3_project_mds <- function(model, newdata) {
+project_mds <- function(model, newdata) {
   newdata <- as.matrix(newdata)
 
-  if (ncol(newdata) != ncol(model$landmarks)) {
-    stop("newdata has the wrong ambient dimension.", call. = FALSE)
+  if (
+    ncol(newdata) != ncol(model$landmarks) ||
+    any(!is.finite(newdata))
+  ) {
+    stop("Invalid MDS projection data.", call. = FALSE)
   }
 
-  distance_squared <- aim3_squared_cross_distance(
+  distance_squared <- squared_cross_distance(
     newdata,
     model$landmarks
   )
-
   distance_centered <- sweep(
     distance_squared,
     1L,
     rowMeans(distance_squared),
     "-"
   )
-
   inner_products <- -0.5 * sweep(
     distance_centered,
     2L,

@@ -13,7 +13,7 @@ AIM3_SETTINGS <- list(
     n_distributional = 50L,
     n_structural = 50L,
     distributional_tail = c(0.995, 0.9995),
-    structural_shift = 3
+    structural_severity = 1
   ),
   split_counts = c(
     embedding = 200L,
@@ -23,6 +23,10 @@ AIM3_SETTINGS <- list(
     label_eval = 200L
   ),
   detector = list(nu = 0.5),
+  bandwidth = list(
+    gamma_scales = c(0.25, 0.5, 1, 2, 4),
+    tie_tolerance = sqrt(.Machine$double.eps)
+  ),
   embedding = list(
     methods = c("mds", "isomap"),
     isomap_k = 10L
@@ -34,9 +38,7 @@ AIM3_SETTINGS <- list(
   real = list(
     datasets = c("ecg200", "fashion_mnist", "shuttle"),
     embedding_dim = 5L,
-    ecg200 = list(
-      data_dir = "dataset/ECG200"
-    ),
+    ecg200 = list(data_dir = "dataset/ECG200"),
     fashion_mnist = list(
       data_dir = "dataset/fashion",
       sample_size = 1000L,
@@ -55,5 +57,6 @@ AIM3_SETTINGS <- list(
   minimum_feature_fraction = 0.10,
   minimum_hit_count = 10L,
   maximum_relative_mc_se = 0.10,
-  aumvc_alpha_grid = seq(0.9, 0.999, by = 0.0001)
+  aumvc_alpha_grid = seq(0.9, 0.999, by = 0.0001),
+  output_digits = 6L
 )

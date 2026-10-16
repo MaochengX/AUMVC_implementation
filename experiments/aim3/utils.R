@@ -1,67 +1,77 @@
-aim3_stratified_indices <- function(strata, size, seed) {
+stratified_indices <- function(strata, size, seed) {
+  if (length(strata) < 1L || anyNA(strata)) {
+    stop("Invalid stratification labels.", call. = FALSE)
+  }
+  size <- as.numeric(size)
+  if (length(size) != 1L || !is.finite(size) || size < 1L || size != floor(size)) {
+    stop("Invalid stratified split size.", call. = FALSE)
+  }
+  size <- as.integer(size)
   strata <- as.character(strata)
   groups <- unique(strata)
-  available <- vapply(groups, function(group) sum(strata == group), integer(1))
-  if (size < length(groups) || any(available < 1L)) {
-    stop("The label-evaluation split cannot represent every stratum.", call. = FALSE)
+  available <- vapply(groups, function(x) sum(strata == x), integer(1))
+  if (size < length(groups) || size > length(strata)) {
+    stop("Invalid stratified split size.", call. = FALSE)
   }
-
   allocation <- rep(1L, length(groups))
-  remaining <- size - sum(allocation)
-  capacity <- available - allocation
+  remaining <- size - length(groups)
+  capacity <- available - 1L
   if (remaining > 0L) {
     target <- remaining * capacity / sum(capacity)
-    addition <- pmin(floor(target), capacity)
-    allocation <- allocation + addition
+    add <- pmin(floor(target), capacity)
+    allocation <- allocation + add
     remaining <- size - sum(allocation)
     priority <- order(target - floor(target), decreasing = TRUE)
     while (remaining > 0L) {
-      changed <- FALSE
-      for (index in priority) {
-        if (allocation[index] < available[index] && remaining > 0L) {
-          allocation[index] <- allocation[index] + 1L
+      for (i in priority) {
+        if (remaining > 0L && allocation[i] < available[i]) {
+          allocation[i] <- allocation[i] + 1L
           remaining <- remaining - 1L
-          changed <- TRUE
         }
       }
-      if (!changed) stop("The stratified split is too large.", call. = FALSE)
     }
   }
-
   set.seed(seed)
-  selected <- unlist(lapply(seq_along(groups), function(index) {
-    sample(which(strata == groups[index]), allocation[index], replace = FALSE)
+  selected <- unlist(lapply(seq_along(groups), function(i) {
+    rows <- which(strata == groups[i])
+    rows[sample.int(length(rows), allocation[i])]
   }), use.names = FALSE)
-  sample(selected)
+  selected[sample.int(length(selected))]
 }
 
-aim3_make_splits <- function(labels, counts, split_names, seed, strata = labels) {
-  labels <- as.integer(labels)
-  counts <- as.integer(counts)
+make_splits <- function(labels, counts, seed, strata = labels) {
+  names_expected <- c(
+    "embedding", "detector_train", "reference", "evaluation", "label_eval"
+  )
   if (
-    length(counts) != length(split_names) ||
-    length(counts) < 2L ||
-    any(counts < 1L) ||
-    sum(counts) != length(labels) ||
-    !all(labels %in% c(0L, 1L))
+    is.null(names(counts)) ||
+    anyDuplicated(names(counts)) ||
+    !setequal(names(counts), names_expected)
   ) {
-    stop("Invalid Aim 3 split request.", call. = FALSE)
+    stop("Invalid split counts.", call. = FALSE)
   }
-
-  if (length(strata) != length(labels) || anyNA(strata)) {
-    stop("Invalid Aim 3 stratification values.", call. = FALSE)
+  counts <- counts[names_expected]
+  if (
+    anyNA(counts) ||
+    any(!is.finite(counts)) ||
+    any(counts < 1) ||
+    any(counts != floor(counts)) ||
+    sum(counts) != length(labels) ||
+    length(strata) != length(labels)
+  ) {
+    stop("Invalid split counts.", call. = FALSE)
   }
-  n_label <- tail(counts, 1L)
-  label_eval <- aim3_stratified_indices(strata, n_label, seed)
+  counts <- setNames(as.integer(counts), names_expected)
+  label_eval <- stratified_indices(strata, counts["label_eval"], seed)
   remaining <- setdiff(seq_along(labels), label_eval)
-  remaining_counts <- head(counts, -1L)
   set.seed(seed + 1L)
-  selected <- sample(remaining, sum(remaining_counts), replace = FALSE)
-  ends <- cumsum(remaining_counts)
+  remaining <- remaining[sample.int(length(remaining))]
+  sizes <- counts[names_expected[-5L]]
+  ends <- cumsum(sizes)
   starts <- c(1L, head(ends, -1L) + 1L)
-  splits <- Map(function(first, last) selected[first:last], starts, ends)
-  splits[[length(split_names)]] <- label_eval
-  names(splits) <- split_names
+  splits <- Map(function(a, b) remaining[a:b], starts, ends)
+  names(splits) <- names_expected[-5L]
+  splits$label_eval <- label_eval
   splits
 }
 
@@ -78,66 +88,93 @@ apply_standardizer <- function(x, standardizer) {
 }
 
 roc_auc_score <- function(labels, scores) {
-  n_positive <- sum(labels == 1L)
-  n_negative <- sum(labels == 0L)
-  if (n_positive == 0L || n_negative == 0L) {
-    stop("ROC-AUC requires both classes.", call. = FALSE)
-  }
+  labels <- as.integer(labels)
+  positives <- sum(labels == 1L)
+  negatives <- sum(labels == 0L)
+  if (!positives || !negatives) stop("ROC-AUC requires both classes.", call. = FALSE)
   ranks <- rank(scores, ties.method = "average")
-  (sum(ranks[labels == 1L]) - n_positive * (n_positive + 1) / 2) /
-    (n_positive * n_negative)
+  (sum(ranks[labels == 1L]) - positives * (positives + 1) / 2) /
+    (positives * negatives)
 }
 
 pr_auc_score <- function(labels, scores) {
-  n_positive <- sum(labels == 1L)
-  if (n_positive == 0L) stop("PR-AUC requires positive observations.", call. = FALSE)
-
+  labels <- as.integer(labels)
+  positives <- sum(labels == 1L)
+  if (!positives) stop("PR-AUC requires positive observations.", call. = FALSE)
   index <- order(scores, decreasing = TRUE)
   labels <- labels[index]
   scores <- scores[index]
   true_positive <- cumsum(labels == 1L)
-  end_of_tie <- c(which(scores[-length(scores)] != scores[-1L]), length(scores))
-  precision <- true_positive[end_of_tie] / end_of_tie
-  recall <- true_positive[end_of_tie] / n_positive
+  end_tie <- c(which(diff(scores) != 0), length(scores))
+  precision <- true_positive[end_tie] / end_tie
+  recall <- true_positive[end_tie] / positives
   trapezoid_area(c(0, recall), c(1, precision))
 }
 
-aim3_percentile_scores <- function(calibration_scores, scores) {
+percentile_scores <- function(calibration_scores, scores) {
   calibration_scores <- sort(validate_scores(calibration_scores))
   scores <- validate_scores(scores)
   findInterval(scores, calibration_scores, rightmost.closed = TRUE) /
     length(calibration_scores)
 }
 
-aim3_format_number <- function(value) {
-  if (is.na(value)) return(NA_character_)
-  if (!is.finite(value)) return(as.character(value))
-  if (value != 0 && (abs(value) < 1e-4 || abs(value) >= 1e6)) {
-    return(sprintf("%.4e", value))
-  }
-  sprintf("%.4f", value)
+attach_metadata <- function(metadata, result) {
+  cbind(metadata[rep(1L, nrow(result)), , drop = FALSE], result, row.names = NULL)
 }
 
-aim3_next_experiment <- function(root) {
-  dir.create(root, recursive = TRUE, showWarnings = FALSE)
-  entries <- list.dirs(root, recursive = FALSE, full.names = FALSE)
-  numbers <- suppressWarnings(as.integer(sub("^exp", "", entries)))
-  next_number <- if (any(!is.na(numbers))) max(numbers, na.rm = TRUE) + 1L else 1L
-  path <- file.path(root, paste0("exp", next_number))
-  dir.create(path, recursive = FALSE)
-  path
+result_dirs <- function(type) {
+  root <- file.path("experiments/aim3/result", type)
+  experiment <- file.path(root, "experiment")
+  analysis <- file.path(root, "analysis")
+  dir.create(experiment, recursive = TRUE, showWarnings = FALSE)
+  dir.create(analysis, recursive = TRUE, showWarnings = FALSE)
+  list(experiment = experiment, analysis = analysis)
 }
 
-aim3_save_csv <- function(result, path) {
-  numeric_columns <- vapply(result, is.numeric, logical(1))
-  identifiers <- c(
-    "run", "intrinsic_dim", "ambient_dim", "original_dim",
-    "effective_dim", "sample_size", "embedding_dim", "snr"
+write_report <- function(data, path, digits = 6L) {
+  output <- data
+  integer_columns <- c(
+    "run", "sample_size", "original_dim", "embedding_dim", "detector_dim",
+    "intrinsic_dim", "min_hit_count", "compared_pairs_count"
   )
-  numeric_columns[names(numeric_columns) %in% identifiers] <- FALSE
-  result[numeric_columns] <- lapply(result[numeric_columns], function(column) {
-    vapply(column, aim3_format_number, character(1))
-  })
-  utils::write.csv(result, path, row.names = FALSE, na = "")
+  numeric <- names(output)[vapply(output, is.numeric, logical(1))]
+  for (column in intersect(integer_columns, numeric)) {
+    values <- output[[column]]
+    output[[column]] <- ifelse(is.na(values), NA_character_, as.character(as.integer(round(values))))
+  }
+  for (column in setdiff(numeric, integer_columns)) {
+    values <- output[[column]]
+    output[[column]] <- ifelse(
+      is.finite(values),
+      formatC(values, format = "f", digits = digits),
+      NA_character_
+    )
+  }
+  utils::write.csv(output, path, row.names = FALSE, na = "", quote = FALSE)
   path
+}
+
+mean_finite <- function(x) {
+  x <- x[is.finite(x)]
+  if (length(x)) mean(x) else NA_real_
+}
+
+mode_unique <- function(x) {
+  x <- x[is.finite(x)]
+  if (!length(x)) return(NA_real_)
+  count <- table(x)
+  winners <- names(count)[count == max(count)]
+  if (length(winners) == 1L) as.numeric(winners) else NA_real_
+}
+
+group_rows <- function(data, columns) {
+  key <- do.call(paste, c(lapply(data[columns], function(x) ifelse(is.na(x), "<na>", x)), sep = "\r"))
+  split(seq_len(nrow(data)), key)
+}
+
+validate_runs <- function(n_runs) {
+  if (length(n_runs) != 1L || !is.finite(n_runs) || n_runs < 1L || n_runs != floor(n_runs)) {
+    stop("n_runs must be a positive integer.", call. = FALSE)
+  }
+  as.integer(n_runs)
 }
