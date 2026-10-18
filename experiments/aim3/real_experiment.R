@@ -172,6 +172,15 @@ real_bandwidth_columns <- c(
   "reliable_agreement_pairs_rank_rate", "tie_rate"
 )
 
+evaluate_real_task <- function(task) {
+  set.seed(task$seed, kind = "Mersenne-Twister", normal.kind = "Inversion", sample.kind = "Rejection")
+  evaluated <- evaluate_case(task$case, task$seed, task$settings)
+  list(
+    results = attach_metadata(task$metadata, evaluated$results),
+    bandwidth = attach_metadata(task$metadata, evaluated$bandwidth)
+  )
+}
+
 run_real_experiment <- function(settings = AIM3_SETTINGS) {
   n_runs <- validate_runs(settings$n_runs)
   registry <- real_registry()
@@ -189,32 +198,57 @@ run_real_experiment <- function(settings = AIM3_SETTINGS) {
   done <- 0L
   start <- proc.time()[[3L]]
   cat("\naim3 real\n")
+  parallel <- isTRUE(settings$parallel$enabled)
+  workers <- if (parallel) as.integer(settings$parallel$workers) else 1L
+  if (length(workers) != 1L || is.na(workers) || workers < 1L) {
+    stop("parallel$workers must be a positive integer.", call. = FALSE)
+  }
+  if (parallel && workers > 1L) {
+    if (!requireNamespace("future", quietly = TRUE) ||
+        !requireNamespace("future.apply", quietly = TRUE)) {
+      stop("Install 'future' and 'future.apply' for parallel execution.", call. = FALSE)
+    }
+    previous_plan <- future::plan()
+    future::plan(future::multisession, workers = workers)
+    on.exit(future::plan(previous_plan), add = TRUE)
+  }
   for (run in seq_len(n_runs)) {
-    for (dataset in datasets) {
-      seed <- settings$seed + run * 100000L + match(dataset, datasets) * 10000L
+    sampled_cases <- lapply(seq_along(datasets), function(i) {
+      dataset <- datasets[i]
+      seed <- settings$seed + run * 100000L + i * 10000L
+      set.seed(seed, kind = "Mersenne-Twister", normal.kind = "Inversion", sample.kind = "Rejection")
       sampled <- registry[[dataset]]$sample(loaded[[dataset]], seed, settings$real[[dataset]])
       case_settings <- settings
       case_settings$split_counts <- real_split_counts(nrow(sampled$x))
-      case <- list(
-        x = sampled$x,
-        labels = sampled$labels,
-        intrinsic_dim = as.integer(settings$real$embedding_dim)
+      list(
+        case = list(
+          x = sampled$x,
+          labels = sampled$labels,
+          intrinsic_dim = as.integer(settings$real$embedding_dim)
+        ),
+        seed = seed + 50000L,
+        settings = case_settings,
+        metadata = data.frame(
+          dataset = dataset,
+          run = run,
+          sample_size = nrow(sampled$x),
+          original_dim = ncol(sampled$x),
+          stringsAsFactors = FALSE
+        )
       )
-      evaluated <- evaluate_case(case, seed + 50000L, case_settings)
-      metadata <- data.frame(
-        dataset = dataset,
-        run = run,
-        sample_size = nrow(sampled$x),
-        original_dim = ncol(sampled$x),
-        stringsAsFactors = FALSE
-      )
-      done <- done + 1L
-      results[[done]] <- attach_metadata(metadata, evaluated$results)
-      bandwidth[[done]] <- attach_metadata(metadata, evaluated$bandwidth)
-      elapsed <- proc.time()[[3L]] - start
-      cat(sprintf("\r%d/%d | elapsed %.0fs | eta %.0fs", done, total, elapsed, elapsed * (total - done) / done))
-      flush.console()
+    })
+    cases <- if (parallel && workers > 1L) {
+      future.apply::future_lapply(sampled_cases, evaluate_real_task, future.seed = TRUE)
+    } else {
+      lapply(sampled_cases, evaluate_real_task)
     }
+    index <- done + seq_along(cases)
+    results[index] <- lapply(cases, `[[`, "results")
+    bandwidth[index] <- lapply(cases, `[[`, "bandwidth")
+    done <- done + length(cases)
+    elapsed <- proc.time()[[3L]] - start
+    cat(sprintf("\r%d/%d | elapsed %.0fs | eta %.0fs", done, total, elapsed, elapsed * (total - done) / done))
+    flush.console()
     current_results <- do.call(rbind, results[seq_len(done)])
     current_bandwidth <- do.call(rbind, bandwidth[seq_len(done)])
     current_results <- current_results[, real_result_columns, drop = FALSE]

@@ -19,6 +19,8 @@ aumvc_from_scores <- function(
   n <- length(evaluation_scores)
   ordered_scores <- sort(evaluation_scores, decreasing = TRUE)
   threshold <- ordered_scores[pmin(n, ceiling(alpha_grid * n))]
+  unique_threshold <- unique(threshold)
+  threshold_index <- match(threshold, unique_threshold)
 
   count_below <- function(sorted_values, value) {
     left <- 1L
@@ -35,11 +37,18 @@ aumvc_from_scores <- function(
   }
   sorted_reference <- sort(reference_scores)
 
-  hit_count <- length(sorted_reference) - vapply(
-    threshold,
+  unique_hits <- length(sorted_reference) - vapply(
+    unique_threshold,
     function(value) count_below(sorted_reference, value),
     integer(1)
   )
+  hit_count <- unique_hits[threshold_index]
+  sorted_evaluation <- rev(ordered_scores)
+  unique_mass <- (n - vapply(
+    unique_threshold,
+    function(value) count_below(sorted_evaluation, value),
+    integer(1)
+  )) / n
   occupancy <- hit_count / length(reference_scores)
 
   volume <- scale_occupancy_volume(
@@ -75,11 +84,7 @@ aumvc_from_scores <- function(
   curve <- data.frame(
     alpha = alpha_grid,
     threshold = threshold,
-    empirical_mass = vapply(
-      threshold,
-      function(value) mean(evaluation_scores >= value),
-      numeric(1)
-    ),
+    empirical_mass = unique_mass[threshold_index],
     hit_count = hit_count,
     volume = volume,
     volume_normalized = occupancy
@@ -112,14 +117,31 @@ aumvc <- function(
   reference_scores <- score_reference_repetitions(reference, score_fun)
   combined_scores <- unlist(reference_scores, use.names = FALSE)
 
-  result <- aumvc_from_scores(
+  aumvc_scored(
     evaluation_scores,
     combined_scores,
+    reference,
+    score_direction,
+    alpha_grid
+  )
+}
+
+aumvc_scored <- function(
+    evaluation_scores, reference_scores, reference,
+    score_direction = "normality",
+    alpha_grid = seq(0.9, 0.999, by = 0.0001)
+) {
+  evaluation_scores <- validate_scores(evaluation_scores)
+  reference_scores <- validate_scores(reference_scores)
+  result <- aumvc_from_scores(
+    evaluation_scores,
+    reference_scores,
     reference$box$volume,
     score_direction,
     alpha_grid,
     reference$box$log_volume
   )
+  combined_scores <- reference_scores
   curve <- result$mv_curve
   occupancy_se <- sqrt(
     curve$volume_normalized * (1 - curve$volume_normalized) /

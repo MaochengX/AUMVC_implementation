@@ -128,26 +128,51 @@ prepare_representations <- function(case, seed, settings) {
   list(prepared = prepared, embeddings = embeddings)
 }
 
+prepare_candidate_scores <- function(x_train, x_eval, x_label, reference, scales, settings) {
+  candidates <- lapply(scales, function(scale) {
+    start <- proc.time()[[3L]]
+    model <- fit_ocsvm(
+      x_train,
+      nu = settings$detector$nu,
+      gamma = scale / ncol(x_train)
+    )
+    evaluation_scores <- score_ocsvm(model, x_eval)
+    label_scores <- score_ocsvm(model, x_label)
+    list(
+      model = model,
+      evaluation_scores = evaluation_scores,
+      label_scores = label_scores,
+      runtime = proc.time()[[3L]] - start
+    )
+  })
+  score_funs <- lapply(candidates, function(item) {
+    model <- item$model
+    function(points) score_ocsvm(model, points)
+  })
+  reference_result <- score_reference_candidates(reference, score_funs)
+  for (i in seq_along(candidates)) {
+    candidates[[i]]$reference_scores <- reference_result$scores[, i]
+    candidates[[i]]$runtime <- candidates[[i]]$runtime +
+      reference_result$candidate_runtime[i]
+  }
+  list(candidates = candidates, shared_runtime = reference_result$shared_runtime)
+}
+
 evaluate_candidate <- function(
     representation, x_train, x_eval, x_label, labels_label, types_label,
-    reference, gamma_scale, settings, embedding_oos_stress = NA_real_
+    reference, gamma_scale, settings, embedding_oos_stress = NA_real_,
+    candidate
 ) {
   start <- proc.time()[[3L]]
   detector_dim <- ncol(x_train)
-  model <- fit_ocsvm(
-    x_train,
-    nu = settings$detector$nu,
-    gamma = gamma_scale / detector_dim
-  )
-  score_fun <- function(x) score_ocsvm(model, x)
-  mv <- aumvc(
-    x_eval,
+  mv <- aumvc_scored(
+    candidate$evaluation_scores,
+    candidate$reference_scores,
     reference,
-    score_fun,
     score_direction = "anomaly",
     alpha_grid = settings$aumvc_alpha_grid
   )
-  label_scores <- score_fun(x_label)
+  label_scores <- candidate$label_scores
   subtype <- compute_type_metrics(labels_label, label_scores, types_label)
   data.frame(
     embedding_dim = if (representation %in% c("mds", "isomap")) detector_dim else NA_integer_,
@@ -167,7 +192,7 @@ evaluate_candidate <- function(
     roc_structural = unname(subtype["roc_structural"]),
     pr_structural = unname(subtype["pr_structural"]),
     embedding_oos_stress = embedding_oos_stress,
-    candidate_runtime = proc.time()[[3L]] - start,
+    candidate_runtime = candidate$runtime + proc.time()[[3L]] - start,
     aumvc_reliable = aumvc_reliable(
       mv$aumvc_normalized,
       mv$aumvc_relative_mc_se,
@@ -188,10 +213,15 @@ evaluate_grid <- function(
   reference <- make_experiment_reference(x_reference, seed, settings)
   shared <- setup_runtime + proc.time()[[3L]] - start
   scales <- gamma_scales(settings)
-  rows <- lapply(scales, function(scale) {
+  scored <- prepare_candidate_scores(
+    x_train, x_eval, x_label, reference, scales, settings
+  )
+  shared <- shared + scored$shared_runtime
+  rows <- lapply(seq_along(scales), function(i) {
     evaluate_candidate(
       representation, x_train, x_eval, x_label, labels_label, types_label,
-      reference, scale, settings, embedding_oos_stress
+      reference, scales[i], settings, embedding_oos_stress,
+      scored$candidates[[i]]
     )
   })
   result <- do.call(rbind, rows)
@@ -239,25 +269,22 @@ evaluate_goix <- function(
     eval <- x_eval[, columns, drop = FALSE]
     label <- x_label[, columns, drop = FALSE]
     reference <- references[[j]]
+    scored <- prepare_candidate_scores(
+      train, eval, label, reference, scales, settings
+    )
+    shared <- shared + scored$shared_runtime
     for (s in seq_along(scales)) {
       candidate_start <- proc.time()[[3L]]
-      model <- fit_ocsvm(
-        train,
-        nu = settings$detector$nu,
-        gamma = scales[s] / ncol(train)
-      )
-      score_fun <- function(x) score_ocsvm(model, x)
-      mv <- aumvc(
-        eval,
+      candidate <- scored$candidates[[s]]
+      mv <- aumvc_scored(
+        candidate$evaluation_scores,
+        candidate$reference_scores,
         reference,
-        score_fun,
         score_direction = "anomaly",
         alpha_grid = settings$aumvc_alpha_grid
       )
-      eval_scores <- score_fun(eval)
-      label_scores <- score_fun(label)
       ensemble_scores[, s] <- ensemble_scores[, s] +
-        percentile_scores(eval_scores, label_scores) / n_subsets
+        percentile_scores(candidate$evaluation_scores, candidate$label_scores) / n_subsets
       contributions[, s] <- contributions[, s] + mv$mc_contribution / n_subsets
       subset_results[[s]][[j]] <- data.frame(
         aumvc_normalized = mv$aumvc_normalized,
@@ -267,9 +294,11 @@ evaluate_goix <- function(
         low_occupancy = mv$low_occupancy,
         box_log_volume = reference$box$log_volume
       )
-      runtime[s] <- runtime[s] + proc.time()[[3L]] - candidate_start
+      runtime[s] <- runtime[s] + candidate$runtime +
+        proc.time()[[3L]] - candidate_start
     }
   }
+
   rows <- lapply(seq_along(scales), function(s) {
     subset <- do.call(rbind, subset_results[[s]])
     normalized <- mean(subset$aumvc_normalized)

@@ -147,6 +147,32 @@ synthetic_bandwidth_columns <- c(
   "selected_gamma_scale_reliable", "reliable_agreement_pairs_rank_rate", "tie_rate"
 )
 
+evaluate_synthetic_task <- function(task) {
+  row <- task$row
+  run <- task$run
+  settings <- task$settings
+  seed <- synthetic_seed(row, run, settings$synthetic, settings$seed)
+  set.seed(seed, kind = "Mersenne-Twister", normal.kind = "Inversion", sample.kind = "Rejection")
+  case <- generate_synthetic(
+    row$intrinsic_dim, row$original_dim, row$snr, row$truth,
+    seed, settings$synthetic
+  )
+  evaluated <- evaluate_case(case, seed + 50000L, settings)
+  metadata <- data.frame(
+    run = run,
+    truth = row$truth,
+    intrinsic_dim = row$intrinsic_dim,
+    snr = row$snr,
+    sample_size = nrow(case$x),
+    original_dim = row$original_dim,
+    stringsAsFactors = FALSE
+  )
+  list(
+    results = attach_metadata(metadata, evaluated$results),
+    bandwidth = attach_metadata(metadata, evaluated$bandwidth)
+  )
+}
+
 run_synthetic_experiment <- function(settings = AIM3_SETTINGS) {
   n_runs <- validate_runs(settings$n_runs)
   grid <- synthetic_grid(settings$synthetic)
@@ -157,31 +183,36 @@ run_synthetic_experiment <- function(settings = AIM3_SETTINGS) {
   done <- 0L
   start <- proc.time()[[3L]]
   cat("\naim3 synthetic\n")
-  for (run in seq_len(n_runs)) {
-    for (i in seq_len(nrow(grid))) {
-      row <- grid[i, , drop = FALSE]
-      seed <- synthetic_seed(row, run, settings$synthetic, settings$seed)
-      case <- generate_synthetic(
-        row$intrinsic_dim, row$original_dim, row$snr, row$truth,
-        seed, settings$synthetic
-      )
-      evaluated <- evaluate_case(case, seed + 50000L, settings)
-      metadata <- data.frame(
-        run = run,
-        truth = row$truth,
-        intrinsic_dim = row$intrinsic_dim,
-        snr = row$snr,
-        sample_size = nrow(case$x),
-        original_dim = row$original_dim,
-        stringsAsFactors = FALSE
-      )
-      done <- done + 1L
-      results[[done]] <- attach_metadata(metadata, evaluated$results)
-      bandwidth[[done]] <- attach_metadata(metadata, evaluated$bandwidth)
-      elapsed <- proc.time()[[3L]] - start
-      cat(sprintf("\r%d/%d | elapsed %.0fs | eta %.0fs", done, total, elapsed, elapsed * (total - done) / done))
-      flush.console()
+  parallel <- isTRUE(settings$parallel$enabled)
+  workers <- if (parallel) as.integer(settings$parallel$workers) else 1L
+  if (length(workers) != 1L || is.na(workers) || workers < 1L) {
+    stop("parallel$workers must be a positive integer.", call. = FALSE)
+  }
+  if (parallel && workers > 1L) {
+    if (!requireNamespace("future", quietly = TRUE) ||
+        !requireNamespace("future.apply", quietly = TRUE)) {
+      stop("Install 'future' and 'future.apply' for parallel execution.", call. = FALSE)
     }
+    previous_plan <- future::plan()
+    future::plan(future::multisession, workers = workers)
+    on.exit(future::plan(previous_plan), add = TRUE)
+  }
+  for (run in seq_len(n_runs)) {
+    jobs <- lapply(seq_len(nrow(grid)), function(i) {
+      list(row = grid[i, , drop = FALSE], run = run, settings = settings)
+    })
+    cases <- if (parallel && workers > 1L) {
+      future.apply::future_lapply(jobs, evaluate_synthetic_task, future.seed = TRUE)
+    } else {
+      lapply(jobs, evaluate_synthetic_task)
+    }
+    index <- done + seq_along(cases)
+    results[index] <- lapply(cases, `[[`, "results")
+    bandwidth[index] <- lapply(cases, `[[`, "bandwidth")
+    done <- done + length(cases)
+    elapsed <- proc.time()[[3L]] - start
+    cat(sprintf("\r%d/%d | elapsed %.0fs | eta %.0fs", done, total, elapsed, elapsed * (total - done) / done))
+    flush.console()
     current_results <- do.call(rbind, results[seq_len(done)])
     current_bandwidth <- do.call(rbind, bandwidth[seq_len(done)])
     current_results <- current_results[, synthetic_result_columns, drop = FALSE]

@@ -115,6 +115,48 @@ score_reference_repetitions <- function(reference, score_fun) {
   })
 }
 
+score_reference_candidates <- function(reference, score_funs) {
+  if (!is.list(score_funs) || !length(score_funs) ||
+      !all(vapply(score_funs, is.function, logical(1)))) {
+    stop("score_funs must be a nonempty list of functions.", call. = FALSE)
+  }
+  n_candidates <- length(score_funs)
+  n_reference <- reference$n_reference
+  total <- n_reference * reference$n_mc_repetitions
+  scores <- matrix(NA_real_, nrow = total, ncol = n_candidates)
+  candidate_runtime <- numeric(n_candidates)
+  start_time <- proc.time()[[3L]]
+  for (r in seq_len(reference$n_mc_repetitions)) {
+    set.seed(reference$seeds[r])
+    offset <- (r - 1L) * n_reference
+    for (start in seq(1L, n_reference, by = reference$chunk_size)) {
+      end <- min(start + reference$chunk_size - 1L, n_reference)
+      size <- end - start + 1L
+      points <- matrix(
+        runif(size * reference$box$dimension),
+        nrow = size,
+        byrow = TRUE
+      )
+      points <- sweep(points, 2L, reference$box$width, "*")
+      points <- sweep(points, 2L, reference$box$lower, "+")
+      for (i in seq_len(n_candidates)) {
+        candidate_start <- proc.time()[[3L]]
+        scores[offset + seq.int(start, end), i] <- validate_scores(
+          score_funs[[i]](points), size, "reference_scores"
+        )
+        candidate_runtime[i] <- candidate_runtime[i] +
+          proc.time()[[3L]] - candidate_start
+      }
+    }
+  }
+  elapsed <- proc.time()[[3L]] - start_time
+  list(
+    scores = scores,
+    candidate_runtime = candidate_runtime,
+    shared_runtime = max(0, elapsed - sum(candidate_runtime))
+  )
+}
+
 scale_occupancy_volume <- function(occupancy, box_volume, box_log_volume = NULL) {
   occupancy <- as.numeric(occupancy)
   if (is.finite(box_volume)) return(box_volume * occupancy)
