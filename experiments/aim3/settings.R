@@ -37,9 +37,14 @@ AIM3_SETTINGS <- list(
     subset_dim = 5L
   ),
   real = list(
-    datasets = c("ecg200", "fashion_mnist", "shuttle"),
+    datasets = c("ecg5000", "fashion_mnist", "shuttle"),
     embedding_dim = 5L,
-    ecg200 = list(data_dir = "dataset/ECG200"),
+    ecg5000 = list(
+      data_dir = "dataset/ECG5000",
+      sample_size = 1000L,
+      normal_class = 1L,
+      anomaly_fraction = 0.10
+    ),
     fashion_mnist = list(
       data_dir = "dataset/fashion",
       sample_size = 1000L,

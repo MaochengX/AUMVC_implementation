@@ -17,11 +17,11 @@ real_split_counts <- function(n) {
 read_ecg_ts <- function(path) {
   lines <- trimws(readLines(path, warn = FALSE))
   data_line <- which(tolower(lines) == "@data")
-  if (length(data_line) != 1L) stop("Invalid ECG200 .ts file.", call. = FALSE)
+  if (length(data_line) != 1L) stop("Invalid ECG .ts file.", call. = FALSE)
   rows <- lines[(data_line + 1L):length(lines)]
   rows <- rows[nzchar(rows) & !startsWith(rows, "#")]
   parts <- strsplit(rows, ":", fixed = TRUE)
-  if (any(lengths(parts) != 2L)) stop("Invalid ECG200 row.", call. = FALSE)
+  if (any(lengths(parts) != 2L)) stop("Invalid ECG row.", call. = FALSE)
   x <- do.call(rbind, lapply(parts, function(row) {
     as.numeric(strsplit(row[1L], ",", fixed = TRUE)[[1L]])
   }))
@@ -52,6 +52,24 @@ load_ecg200 <- function(data_dir) {
   labels <- c(train$labels, test$labels)
   if (nrow(x) != 200L || ncol(x) != 96L || any(!is.finite(x))) {
     stop("Unexpected ECG200 data.", call. = FALSE)
+  }
+  list(x = x, labels = labels)
+}
+
+load_ecg5000 <- function(data_dir) {
+  train_file <- file.path(data_dir, "ECG5000_TRAIN.ts")
+  test_file <- file.path(data_dir, "ECG5000_TEST.ts")
+  if (!file.exists(train_file) || !file.exists(test_file)) {
+    stop("ECG5000 .ts files not found in ", data_dir, call. = FALSE)
+  }
+  train <- read_ecg_ts(train_file)
+  test <- read_ecg_ts(test_file)
+  x <- rbind(train$x, test$x)
+  labels <- c(train$labels, test$labels)
+  if (nrow(x) != 5000L || ncol(x) != 140L ||
+      any(!is.finite(x)) || anyNA(labels) ||
+      !all(labels %in% 1:5)) {
+    stop("Unexpected ECG5000 data.", call. = FALSE)
   }
   list(x = x, labels = labels)
 }
@@ -118,6 +136,32 @@ sample_ecg200 <- function(data, seed, settings) {
   list(x = data$x[rows, , drop = FALSE], labels = as.integer(data$labels[rows] == -1))
 }
 
+sample_ecg5000 <- function(data, seed, settings) {
+  size <- as.integer(settings$sample_size)
+  normal <- as.integer(settings$normal_class)
+  fraction <- settings$anomaly_fraction
+  if (size < 5L || fraction <= 0 || fraction >= 1) {
+    stop("Invalid ECG5000 settings.", call. = FALSE)
+  }
+  normal_rows <- which(data$labels == normal)
+  anomaly_rows <- which(data$labels != normal)
+  n_anomaly <- as.integer(round(size * fraction))
+  n_normal <- size - n_anomaly
+  if (n_normal > length(normal_rows) || n_anomaly > length(anomaly_rows)) {
+    stop("ECG5000 sample is too large.", call. = FALSE)
+  }
+  set.seed(seed)
+  rows <- c(
+    sample(normal_rows, n_normal, replace = FALSE),
+    sample(anomaly_rows, n_anomaly, replace = FALSE)
+  )
+  rows <- sample(rows)
+  list(
+    x = data$x[rows, , drop = FALSE],
+    labels = as.integer(data$labels[rows] != normal)
+  )
+}
+
 sample_fashion_mnist <- function(data, seed, settings) {
   size <- as.integer(settings$sample_size)
   normal <- as.integer(settings$normal_class)
@@ -153,6 +197,7 @@ sample_shuttle <- function(data, seed, settings) {
 real_registry <- function() {
   list(
     ecg200 = list(load = load_ecg200, sample = sample_ecg200),
+    ecg5000 = list(load = load_ecg5000, sample = sample_ecg5000),
     fashion_mnist = list(load = load_fashion_mnist, sample = sample_fashion_mnist),
     shuttle = list(load = load_shuttle, sample = sample_shuttle)
   )
