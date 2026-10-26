@@ -1,0 +1,5 @@
+representation,cases,selected_cases,mean_observed_roc_gap,mean_bootstrap_regret,mean_roc_best_change_rate,intervals_including_zero,paired_intervals_available
+ambient,2.000000,0.000000,,,0.163000,0.000000,0.000000
+goix_subsampling,2.000000,2.000000,0.004533,0.009634,0.436500,2.000000,2.000000
+isomap,2.000000,2.000000,0.013279,0.026916,0.492000,2.000000,2.000000
+mds,2.000000,2.000000,0.002554,0.006940,0.357000,2.000000,2.000000

@@ -1,0 +1,9 @@
+truth,representation,roc_structural,pr_structural,roc_distributional,pr_distributional
+oscillatory_local,ambient,0.761142,0.208754,0.907701,0.466334
+oscillatory_local,goix_subsampling,0.713944,0.158314,0.874885,0.366665
+oscillatory_local,isomap,0.531354,0.079782,0.685664,0.166254
+oscillatory_local,mds,0.616581,0.116255,0.618693,0.137904
+polynomial_interaction,ambient,0.675957,0.101993,0.993339,0.866793
+polynomial_interaction,goix_subsampling,0.668986,0.100886,0.992622,0.861343
+polynomial_interaction,isomap,0.564072,0.079776,0.985612,0.813841
+polynomial_interaction,mds,0.665798,0.099279,0.977603,0.763308
