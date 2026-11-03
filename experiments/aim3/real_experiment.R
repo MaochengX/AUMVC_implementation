@@ -29,33 +29,6 @@ read_ecg_ts <- function(path) {
   list(x = x, labels = labels)
 }
 
-read_ecg_txt <- function(path) {
-  data <- as.matrix(utils::read.table(path, header = FALSE, check.names = FALSE))
-  list(x = data[, -1L, drop = FALSE], labels = data[, 1L])
-}
-
-load_ecg200 <- function(data_dir) {
-  train_ts <- file.path(data_dir, "ECG200_TRAIN.ts")
-  test_ts <- file.path(data_dir, "ECG200_TEST.ts")
-  train_txt <- file.path(data_dir, "ECG200_TRAIN.txt")
-  test_txt <- file.path(data_dir, "ECG200_TEST.txt")
-  if (file.exists(train_ts) && file.exists(test_ts)) {
-    train <- read_ecg_ts(train_ts)
-    test <- read_ecg_ts(test_ts)
-  } else if (file.exists(train_txt) && file.exists(test_txt)) {
-    train <- read_ecg_txt(train_txt)
-    test <- read_ecg_txt(test_txt)
-  } else {
-    stop("ECG200 files not found in ", data_dir, call. = FALSE)
-  }
-  x <- rbind(train$x, test$x)
-  labels <- c(train$labels, test$labels)
-  if (nrow(x) != 200L || ncol(x) != 96L || any(!is.finite(x))) {
-    stop("Unexpected ECG200 data.", call. = FALSE)
-  }
-  list(x = x, labels = labels)
-}
-
 load_ecg5000 <- function(data_dir) {
   train_file <- file.path(data_dir, "ECG5000_TRAIN.ts")
   test_file <- file.path(data_dir, "ECG5000_TEST.ts")
@@ -130,49 +103,19 @@ load_shuttle <- function(data_dir) {
   list(x = data[, 1:9, drop = FALSE], labels = data[, 10L])
 }
 
-sample_ecg200 <- function(data, seed, settings) {
-  set.seed(seed)
-  rows <- sample.int(nrow(data$x))
-  list(x = data$x[rows, , drop = FALSE], labels = as.integer(data$labels[rows] == -1))
-}
-
-sample_ecg5000 <- function(data, seed, settings) {
+sample_by_normal_class <- function(data, seed, settings, dataset) {
   size <- as.integer(settings$sample_size)
   normal <- as.integer(settings$normal_class)
   fraction <- settings$anomaly_fraction
   if (size < 5L || fraction <= 0 || fraction >= 1) {
-    stop("Invalid ECG5000 settings.", call. = FALSE)
+    stop("Invalid ", dataset, " settings.", call. = FALSE)
   }
   normal_rows <- which(data$labels == normal)
   anomaly_rows <- which(data$labels != normal)
   n_anomaly <- as.integer(round(size * fraction))
   n_normal <- size - n_anomaly
   if (n_normal > length(normal_rows) || n_anomaly > length(anomaly_rows)) {
-    stop("ECG5000 sample is too large.", call. = FALSE)
-  }
-  set.seed(seed)
-  rows <- c(
-    sample(normal_rows, n_normal, replace = FALSE),
-    sample(anomaly_rows, n_anomaly, replace = FALSE)
-  )
-  rows <- sample(rows)
-  list(
-    x = data$x[rows, , drop = FALSE],
-    labels = as.integer(data$labels[rows] != normal)
-  )
-}
-
-sample_fashion_mnist <- function(data, seed, settings) {
-  size <- as.integer(settings$sample_size)
-  normal <- as.integer(settings$normal_class)
-  fraction <- settings$anomaly_fraction
-  if (size < 5L || fraction <= 0 || fraction >= 1) stop("Invalid Fashion-MNIST settings.", call. = FALSE)
-  normal_rows <- which(data$labels == normal)
-  anomaly_rows <- which(data$labels != normal)
-  n_anomaly <- as.integer(round(size * fraction))
-  n_normal <- size - n_anomaly
-  if (n_normal > length(normal_rows) || n_anomaly > length(anomaly_rows)) {
-    stop("Fashion-MNIST sample is too large.", call. = FALSE)
+    stop(dataset, " sample is too large.", call. = FALSE)
   }
   set.seed(seed)
   rows <- c(
@@ -181,6 +124,14 @@ sample_fashion_mnist <- function(data, seed, settings) {
   )
   rows <- sample(rows)
   list(x = data$x[rows, , drop = FALSE], labels = as.integer(data$labels[rows] != normal))
+}
+
+sample_ecg5000 <- function(data, seed, settings) {
+  sample_by_normal_class(data, seed, settings, "ECG5000")
+}
+
+sample_fashion_mnist <- function(data, seed, settings) {
+  sample_by_normal_class(data, seed, settings, "Fashion-MNIST")
 }
 
 sample_shuttle <- function(data, seed, settings) {
@@ -196,7 +147,6 @@ sample_shuttle <- function(data, seed, settings) {
 
 real_registry <- function() {
   list(
-    ecg200 = list(load = load_ecg200, sample = sample_ecg200),
     ecg5000 = list(load = load_ecg5000, sample = sample_ecg5000),
     fashion_mnist = list(load = load_fashion_mnist, sample = sample_fashion_mnist),
     shuttle = list(load = load_shuttle, sample = sample_shuttle)

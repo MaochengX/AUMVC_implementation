@@ -52,11 +52,26 @@ gamma_scales <- function(settings) {
   scales
 }
 
-aumvc_reliable <- function(aumvc_normalized, relative_se, min_hit_count, settings) {
+mv_degeneracy <- function(mv, reference_scores) {
+  thresholds <- mv$mv_curve$threshold
+  occupancy <- mv$mv_curve$volume_normalized
+  near_constant <- function(x) {
+    diff(range(x)) <= 1e-10 * max(1, max(abs(x)))
+  }
+  c(
+    threshold_collapsed = near_constant(thresholds),
+    reference_collapsed = near_constant(reference_scores),
+    full_box = any(occupancy >= 1 - 1e-12)
+  )
+}
+
+aumvc_reliable <- function(aumvc_normalized, relative_se, min_hit_count, settings,
+                           mv, reference_scores) {
   is.finite(aumvc_normalized) &&
     is.finite(relative_se) &&
     min_hit_count >= settings$minimum_hit_count &&
-    relative_se <= settings$maximum_relative_mc_se
+    relative_se <= settings$maximum_relative_mc_se &&
+    !any(mv_degeneracy(mv, reference_scores))
 }
 
 prepare_case_data <- function(case, seed, settings) {
@@ -197,7 +212,9 @@ evaluate_candidate <- function(
       mv$aumvc_normalized,
       mv$aumvc_relative_mc_se,
       mv$minimum_hit_count,
-      settings
+      settings,
+      mv,
+      candidate$reference_scores
     )
   )
 }
@@ -292,7 +309,8 @@ evaluate_goix <- function(
         min_hit_count = mv$minimum_hit_count,
         zero_occupancy = mv$zero_occupancy,
         low_occupancy = mv$low_occupancy,
-        box_log_volume = reference$box$log_volume
+        box_log_volume = reference$box$log_volume,
+        mv_degenerate = any(mv_degeneracy(mv, candidate$reference_scores))
       )
       runtime[s] <- runtime[s] + candidate$runtime +
         proc.time()[[3L]] - candidate_start
@@ -312,7 +330,8 @@ evaluate_goix <- function(
       all(is.finite(subset$aumvc_normalized)) &&
       min(subset$min_hit_count) >= settings$minimum_hit_count &&
       all(is.finite(subset$aumvc_relative_mc_se)) &&
-      max(subset$aumvc_relative_mc_se) <= settings$maximum_relative_mc_se
+      max(subset$aumvc_relative_mc_se) <= settings$maximum_relative_mc_se &&
+      !any(subset$mv_degenerate)
     data.frame(
       embedding_dim = NA_integer_,
       detector_dim = as.integer(settings$goix_subsampling$subset_dim),
