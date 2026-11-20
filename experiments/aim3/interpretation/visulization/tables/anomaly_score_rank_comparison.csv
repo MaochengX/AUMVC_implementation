@@ -1,0 +1,5 @@
+"Dataset","Representation","Runs","Mean rank gamma 0.25","Mean rank gamma 4","Rank change ± SE"
+"ECG5000","Isomap",10,"0.873","0.764","-0.109 ± 0.018"
+"ECG5000","MDS",10,"0.855","0.782","-0.073 ± 0.017"
+"Shuttle","Isomap",10,"0.931","0.845","-0.086 ± 0.019"
+"Shuttle","MDS",10,"0.950","0.926","-0.025 ± 0.004"
